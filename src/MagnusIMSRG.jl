@@ -1,7 +1,7 @@
 module MagnusIMSRG
 
 using ManyBody
-using Loppy.Util: cartesian_pow, bernoulli
+using JuliaUtil: cartesian_pow, bernoulli
 
 const SPBASIS = Bases.Index{Bases.Pairing{4}}
 const REFSTATE = RefStates.Fermi{2, Bases.Pairing{4}}
