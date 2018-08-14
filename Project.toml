@@ -1,0 +1,6 @@
+authors = ["Nicholas <todoroff@nscl.msu.edu>"]
+name = "MagnusIMSRG"
+uuid = "e04d59de-9fdb-11e8-340d-a964951f6c8f"
+version = "0.1.0"
+
+[deps]
