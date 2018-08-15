@@ -178,9 +178,9 @@ version = "0.2.1"
 
 [[NLSolversBase]]
 deps = ["Calculus", "DiffEqDiffTools", "DiffResults", "Distributed", "ForwardDiff", "LinearAlgebra", "Random", "SparseArrays", "Test"]
-git-tree-sha1 = "329b80c8b635998255f6cccb3022fe5099a001cb"
+git-tree-sha1 = "75f08d4dd9174855aefe4dc9532569450bffcd93"
 uuid = "d41bc354-129a-5804-8e4c-c37616107c6c"
-version = "7.0.5"
+version = "7.1.0"
 
 [[NLsolve]]
 deps = ["DiffBase", "DiffEqDiffTools", "Distances", "ForwardDiff", "LineSearches", "LinearAlgebra", "NLSolversBase", "Printf", "Reexport", "SparseArrays", "Test"]
@@ -196,9 +196,9 @@ version = "0.3.2"
 
 [[OrdinaryDiffEq]]
 deps = ["DataStructures", "DiffEqBase", "DiffEqDiffTools", "DiffEqOperators", "ForwardDiff", "GenericSVD", "InteractiveUtils", "LinearAlgebra", "Logging", "MuladdMacro", "NLsolve", "Parameters", "Printf", "Random", "RecursiveArrayTools", "Reexport", "Roots", "SparseArrays", "StaticArrays", "Statistics", "Test"]
-git-tree-sha1 = "9895e12f719dc554661586e85da8c5434140f5a2"
+git-tree-sha1 = "7930b2534b49a48875d54015f543d554db9c6f80"
 uuid = "1dea7af3-3e70-54e6-95c3-0bf5283fa5ed"
-version = "4.8.0"
+version = "4.8.1"
 
 [[Parameters]]
 deps = ["Compat", "DataStructures", "REPL"]
