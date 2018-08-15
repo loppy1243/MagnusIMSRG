@@ -9,6 +9,9 @@ const REFSTATE = RefStates.Fermi{2, Bases.Pairing{4}}
 const MBBASIS = Bases.Paired{2, 4}
 const ARRAYOP{N} = F64ArrayOperator{N, SPBASIS}
 const FUNCOP{N} = F64FunctionOperator{N, SPBASIS}
+const MBACTOP = F64ActionOperator{1, MBBASIS}
+
+const LEVEL_SPACING = 1.0
 
 const TwoBodyARRAYOP = Tuple{ARRAYOP{0}, ARRAYOP{1}, ARRAYOP{2}}
 
@@ -105,8 +108,49 @@ function dΩ(Ω, params, s)
     tot
 end
 
+function im_pairingH(g)
+    E0_val = sum(occ(REFSTATE)) do i
+        LEVEL_SPACING*(level(i) - 1) - g/4*isocc(flipspin(i))
+    end
+    E0 = FUNCOP{0}(() -> E0_val)
+    f = FUNCOP{1}() do p, q
+        p != q && return 0
+        LEVEL_SPACING*(level(p)-1) - isocc(p)*g
+    end
+    Γ = FUNCOP{2}() do p, q, r, s
+        mask = (level(p) == level(r)) #=
+            =# * (level(q) == level(s)) #=
+            =# * spinup(p)*spinup(r) #=
+            =# * spindown(q)*spindown(s)
+
+        -g/2*mask
+    end
+
+    (E0, f, Γ)
+end
+
+function to_mbop(op)
+    E0, f, Γ = op
+
+    MBACTOP() do X
+        b0 = E0[]*X
+        b1 = sum(cartesian_pow(SPBASIS, Val{2})) do I
+            p, q = I
+            sgn, NA = normord(A(p', q))
+            f[p, q]*sgn*NA(X)
+        end
+        b2 = sum(cartesian_pow(SPBASIS, Val{4})) do I
+            p, q, r, s = I
+            sgn, NA = normord(A(p', q))
+            Γ[p, q, r, s]*sgn*NA(X)
+        end
+
+        b0 + b1 + b2
+    end
+end
+
 const ALG = Euler()
-function main(Ω, params, s)
+function solve(h)
 end
 
 end # module MagnusIMSRG
