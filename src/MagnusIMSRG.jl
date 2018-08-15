@@ -7,9 +7,10 @@ using JuliaUtil: cartesian_pow, bernoulli
 const SPBASIS = Bases.Index{Bases.Pairing{4}}
 const REFSTATE = RefStates.Fermi{2, Bases.Pairing{4}}
 const MBBASIS = Bases.Paired{2, 4}
+const ELTYPE = Float64
 const ARRAYOP{N} = F64ArrayOperator{N, SPBASIS}
 const FUNCOP{N} = F64FunctionOperator{N, SPBASIS}
-const MBACTOP = F64ActionOperator{1, MBBASIS}
+const MBFUNCOP = F64FunctionOperator{1, MBBASIS}
 
 const LEVEL_SPACING = 1.0
 
@@ -115,7 +116,7 @@ function im_pairingH(g)
     E0 = FUNCOP{0}(() -> E0_val)
     f = FUNCOP{1}() do p, q
         p != q && return 0
-        LEVEL_SPACING*(level(p)-1) - isocc(p)*g
+        2 \ (LEVEL_SPACING*(level(p)-1) - isocc(p)*g/2)
     end
     Γ = FUNCOP{2}() do p, q, r, s
         mask = (level(p) == level(r)) #=
@@ -132,18 +133,27 @@ end
 function to_mbop(op)
     E0, f, Γ = op
 
-    MBACTOP() do X
-        b0 = E0[]*X
+    MBFUNCOP() do Y, X
+        b0 = E0[]*(Y'X)
         b1 = sum(cartesian_pow(SPBASIS, Val{2})) do I
             p, q = I
             sgn, NA = normord(A(p', q))
-            f[p, q]*sgn*NA(X)
+            f[p, q]*sgn*(Y'NA(X))
         end
         b2 = sum(cartesian_pow(SPBASIS, Val{4})) do I
             p, q, r, s = I
             sgn, NA = normord(A(p', q))
-            Γ[p, q, r, s]*sgn*NA(X)
+            val3 = NA(X)
+            val = Γ[p, q, r, s]
+            val2 = val*sgn*(Y'val3)
+            if !iszero(val)
+                @show inner(Y)'inner(val3)
+#                print(map(inner, I), " --> ")
+#                println(sgn, ", ", val, ", ", val2)
+            end
+            val2
         end
+        println()
 
         b0 + b1 + b2
     end
