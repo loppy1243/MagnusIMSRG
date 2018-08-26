@@ -9,14 +9,16 @@ using JuliaUtil: cartesian_pow, bernoulli
 const SPBASIS = Bases.Pairing{4}
 const REFSTATE = RefStates.Fermi(Bases.Pairing{4}, 2)
 const MBBASIS = Bases.Paired{2, 4}
-#const ELTYPE = Float64
-const ARRAYOP{N} = F64ArrayOperator{Bases.Product{N, NTuple{N, SPBASIS}}}
-const FUNCOP{N} = F64FunctionOperator{Bases.Product{N, NTuple{N, SPBASIS}}}
+const ELTYPE = Float64
+const ARRAYOP(N) = F64ArrayOperator{Bases.Product{N, NTuple{N, SPBASIS}}, 2N}
+const FUNCOP(N) = F64FunctionOperator{Bases.Product{N, NTuple{N, SPBASIS}}, 2N}
 const MBFUNCOP = F64FunctionOperator{MBBASIS}
 
 const LEVEL_SPACING = 1.0
+const FERMILEVEL = fermilevel(REFSTATE)
+const ZERO_OP = (zero(ELTYPE), zero(ARRAYOP(1)), zero(ARRAYOP(2)))
 
-const TwoBodyARRAYOP = Tuple{ARRAYOP{0}, ARRAYOP{1}, ARRAYOP{2}}
+const TwoBodyARRAYOP = Tuple{ELTYPE, ARRAYOP(1), ARRAYOP(2)}
 
 isocc(x) = ManyBody.isocc(REFSTATE, x)
 isunocc(x) = ManyBody.isocc(REFSTATE, x)
@@ -32,7 +34,7 @@ function _comm1(A, B)
     A0, A1, A2 = A
     B0, B1, B2 = B
 
-    FUNCOP{1}() do i, j
+    FUNCOP(1)() do i, j
         _comm1_1_2(A1, B2, i, j) + _comm1_2_2(A2, B2, i, j) - _comm1_1_2(B1, A2, i, j)
     end |> tabulate
 end
@@ -40,7 +42,7 @@ function _comm2(A, B)
     A0, A1, A2 = A
     B0, B1, B2 = B
 
-    FUNCOP{2}() do I, J
+    FUNCOP(2)() do I, J
         _comm2_1_2(A1, B2, I, J) + _comm2_2_2(A2, B2, I, J) + _comm2_1_2(B1, A2, I, J)
     end |> tabulate
 end
@@ -91,10 +93,10 @@ function white(Ω::TwoBodyARRAYOP, H0::TwoBodyARRAYOP)
     _b1(i, j) = isunocc(i)*isocc(j)*f[i, j] / Δ(i, j)
     _b2(I, J) = 4 \ isunocc(I)*isocc(J) * Γ[I, J] / Δ(I..., J...)
 
-    b1 = FUNCOP{1}() do I, J
+    b1 = FUNCOP(1)() do I, J
         _b1(I..., J...) - conj(_b1(J..., I...))
     end
-    b2 = FUNCOP{2}() do I, J
+    b2 = FUNCOP(2)() do I, J
         _b2(I..., J...) - conj(_b2(J..., I...))
     end
 
@@ -104,16 +106,23 @@ end
 const comm = comm2
 const generator = white
 
+## Workaround so we can use isapprox()
+Base.:-(a::TwoBodyARRAYOP, b::TwoBodyARRAYOP) = a .- b
+function norm(op)
+    E0, f, Γ = op
+    E0 + vecnorm(f.rep) + vecnorm(Γ.rep)
+end
+
 function dΩ(Ω, params, s)
-    H0, tol, batchsize = params
-    prev_tot = (0.0, zero(ARRAYOP{1}), zero(ARRAYOP{2}))
+    H0, rtol, atol, batchsize = params
+    prev_tot = ZERO_OP
     prev_ad = generator(Ω, H0)
 
     # Do first term
     tot = bernoulli(Float64, 0)/factorial(Float64(0)) .* prev_ad
 
     n = 1
-    while sum(vecnorm.(tot - prev_tot)) tol
+    while !isapprox(tot, prev_tot, norm; rtol=rtol, atol=atol)
         prev_tot = tot
         tot += sum(n:n+batchsize-1) do i
             bernoulli(Float64, i)/factorial(Float64(i)) .* (prev_ad = comm(Ω, prev_ad))
@@ -125,23 +134,20 @@ function dΩ(Ω, params, s)
 end
 
 function im_pairingH(g)
-    E0 = sum(occ(REFSTATE)) do i
-        LEVEL_SPACING*(level(i) - 1) - g/4*isocc(flipspin(i))
+    E0 = 2sum(occ(REFSTATE)) do i
+        LEVEL_SPACING*(level(i) - 1)
+    end - g/2*FERMILEVEL^2
+
+    f = FUNCOP(1)() do p, q
+        (p == q)*(LEVEL_SPACING*(level(p)-1) - g/2*FERMILEVEL)
     end
-    f = FUNCOP{1}() do p, q
-        p != q && return 0
-        2 \ (LEVEL_SPACING*(level(p)-1) - isocc(p)*g/2)
-    end
-    Γ = FUNCOP{2}() do I, J
-        sgn1 = index(I) |> Tuple |> collect |> sortperm |> levicivita
-        sgn2 = index(J) |> Tuple |> collect |> sortperm |> levicivita
-        X = Bases.Slater{SPBASIS}(I...)
-        Y = Bases.Slater{SPBASIS}(J...)
-        g/2/4*sgn1*sgn2 * sum(cartesian_pow(1:nlevels(SPBASIS), Val{2})) do Z
-            p, q, r, s = SPBASIS.((Z[1], Z[1], Z[2], Z[2]),
-                                  (SPINUP, SPINDOWN, SPINUP, SPINDOWN))
-            X'Operators.A(p', q', s, r)(Y)
-        end
+
+    Γ = FUNCOP(2)() do I, J
+        p, q = I; r, s = J
+        mask = (level(p) == level(q))*(level(r) == level(s)) #=
+            =# * spinup(p)*spinup(r)*spindown(q)*spindown(s)
+
+        -g/2*mask
     end
 
     (E0, f, Γ)
@@ -150,26 +156,81 @@ end
 function to_mbop(op)
     E0, f, Γ = op
 
-    MBFUNCOP() do Y, X
-        b0 = E0*(Y'X)
+    MBFUNCOP() do X, Y
+        b0 = E0*(X'Y)
         b1 = sum(matrixiter(f)) do Z
             p, q = Z[1][1], Z[2][1]
             NA = normord(Operators.A(p', q))
-            f[p, q]*(Y'NA(X))
+            f[p, q]*(X'NA(Y))
         end
         b2 = sum(matrixiter(Γ)) do Z
             I, J = Z
             p, q = I; r, s = J
-            NA = normord(Operators.A(p', q', r, s))
-            Γ[I, J]*(Y'NA(X))
+            NA = normord(Operators.A(p', q', s, r))
+            Γ[I, J]*(X'NA(Y))
         end
 
         b0 + b1 + b2
     end
 end
 
+function H(Ω, H0, params)
+    rtol, atol, batchsize = params
+
+    prev_tot = ZERO_OP
+    prev_ad = comm(Ω, H0)
+
+    # First term
+    tot = 1/factorial(0).*prev_ad
+
+    n = 1
+    while !isapprox(tot, prev_to, norm; rtol=rtol, atol=atol)
+        prev_tot = tot
+        tot += sum(n:n+batchsize-1) do i
+            1/factorial(Float64(i)) .* (prev_ad = comm(Ω, prev_ad))
+        end
+        n += batchsize
+    end
+
+    tot
+end
+
+const Ω_RTOL = 0.1
+const Ω_ATOL = 0.0
+const Ω_BATCHSIZE = 5
+const H_RTOL = 0.1
+const H_ATOL = 0.0
+const H_BATCHSIZE = 5
+const S_BIG_STEP = 1.0
+const S_SMALL_STEP = 0.1
+
 const ALG = Euler()
 function solve(h)
+    Ω_params = (h, Ω_RTOL, Ω_ATOL, Ω_BATCHSIZE)
+    H_params = (H_RTOL, H_ATOL, H_BATCHSIZE)
+
+    s = 0.0
+    n = 0
+    integrator = ODEProblem(dΩ, ZERO_OP, (s, s+S_BIG_STEP), Ω_params) #=
+              =# |> x -> init(x, ALG, dt=S_SMALL_STEP)
+    solve!(integrator)
+    n += 1
+
+    h_prev = h
+    h = H(integrator.sol[end], h, H_params)
+
+    while !isapprox(h, h_prev, norm; rtol=H_RTOL, atol=H_ATOL)
+        if n >= MAX_ITERS
+            @warn "Iteration maximum exceeded in solve()" n s
+            break
+        end
+        h_prev = h
+        s = s + S_BIG_STEP; add_tstop!(integrator, s+S_BIG_STEP)
+        solve!(integrator)
+        h = H(integrator.sol[end], h, H_params)
+    end
+
+    h
 end
 
 end # module MagnusIMSRG
