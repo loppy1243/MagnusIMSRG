@@ -137,7 +137,7 @@ function im_pairingH(g)
         sgn2 = index(J) |> Tuple |> collect |> sortperm |> levicivita
         X = Bases.Slater{SPBASIS}(I...)
         Y = Bases.Slater{SPBASIS}(J...)
-        -g/2*sgn1*sgn2 * sum(cartesian_pow(1:nlevels(SPBASIS), Val{2})) do Z
+        g/2/4*sgn1*sgn2 * sum(cartesian_pow(1:nlevels(SPBASIS), Val{2})) do Z
             p, q, r, s = SPBASIS.((Z[1], Z[1], Z[2], Z[2]),
                                   (SPINUP, SPINDOWN, SPINUP, SPINDOWN))
             X'Operators.A(p', q', s, r)(Y)
