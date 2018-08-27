@@ -2,16 +2,36 @@ module MagnusIMSRG
 
 using ManyBody
 import ManyBody.Operators
-using OrdinaryDiffEq
-using Combinatorics: levicivita
+import LinearAlgebra
+import JuliaUtil
+#using OrdinaryDiffEq
+using Combinatorics: levicivita, combinations
 using JuliaUtil: cartesian_pow, bernoulli
+
+### Workaround b/c no internet :(
+JuliaUtil.fbinom(a, b) =
+    factorial(Float64, a) / (factorial(Float64, b)*factorial(Float64, a-b))
+
+### Parameters ###############################################################################
+const Ω_RTOL = 0.1
+const Ω_ATOL = 0.0
+const Ω_BATCHSIZE = 5
+const H_RTOL = 0.1
+const H_ATOL = 0.0
+const INT_RTOL = 0.1
+const INT_ATOL = 0.0
+const H_BATCHSIZE = 5
+const S_BIG_STEP = 1.0
+const S_SMALL_STEP = 0.1
+const MAX_INT_ITERS = 100
+##############################################################################################
 
 const SPBASIS = Bases.Pairing{4}
 const REFSTATE = RefStates.Fermi(Bases.Pairing{4}, 2)
 const MBBASIS = Bases.Paired{2, 4}
 const ELTYPE = Float64
 const ARRAYOP(N) = F64ArrayOperator{Bases.Product{N, NTuple{N, SPBASIS}}, 2N}
-const FUNCOP(N) = F64FunctionOperator{Bases.Product{N, NTuple{N, SPBASIS}}, 2N}
+const FUNCOP(N) = F64FunctionOperator{Bases.Product{N, NTuple{N, SPBASIS}}}
 const MBFUNCOP = F64FunctionOperator{MBBASIS}
 
 const LEVEL_SPACING = 1.0
@@ -24,12 +44,12 @@ isocc(x) = ManyBody.isocc(REFSTATE, x)
 isunocc(x) = ManyBody.isocc(REFSTATE, x)
 normord(x) = ManyBody.normord(REFSTATE, x)
 
-nbody(A, n) = A[n-1]
+nbody(A, n) = A[n+1]
 
 comm2(A::TwoBodyARRAYOP, B::TwoBodyARRAYOP) =
-    (_comm0(BT, A, B), _comm1(A, B), _comm2(A, B))
+    (_comm0(A, B), _comm1(A, B), _comm2(A, B))
 
-_comm0(A, B) = fill(_comm0_2_2(nbody(A, 2), nbody(B, 2)))
+_comm0(A, B) = _comm0_2_2(nbody(A, 2), nbody(B, 2))
 function _comm1(A, B)
     A0, A1, A2 = A
     B0, B1, B2 = B
@@ -82,22 +102,28 @@ function _comm2_2_2(A, B, I, J)
     end
 end
 
-function white(Ω::TwoBodyARRAYOP, H0::TwoBodyARRAYOP)
-    E0, f, Γ = H(Ω, H0)
+function white(Ω::TwoBodyARRAYOP, h0::TwoBodyARRAYOP)
+    E0, f, Γ = H(Ω, h0)
 
     Δ(i, k) = f[i, i] - f[k, k] + Γ[i, k, i, k]
     Δ(i, j, k, l) =
         f[i, i] + f[j, j] - f[k, k] - f[l, l] + Γ[k, l, k, l] + Γ[i, j, i, j] #=
      =# - Γ[i, k, i, k] - Γ[j, l, j, l] - Γ[i, l, i, l] - Γ[j, k, j, k]
 
-    _b1(i, j) = isunocc(i)*isocc(j)*f[i, j] / Δ(i, j)
-    _b2(I, J) = 4 \ isunocc(I)*isocc(J) * Γ[I, J] / Δ(I..., J...)
+    function _b1(i, j)
+        x = isunocc(i)*isocc(j)*f[i, j]
+        iszero(x) ? x : x / Δ(i, j)
+    end
+    function _b2(I, J)
+        x = 4 \ isunocc(I)*isocc(J) * Γ[I, J]
+        iszero(x) ? x : x / Δ(I..., J...)
+    end
 
     b1 = FUNCOP(1)() do I, J
         _b1(I..., J...) - conj(_b1(J..., I...))
     end
     b2 = FUNCOP(2)() do I, J
-        _b2(I..., J...) - conj(_b2(J..., I...))
+        _b2(I, J) - conj(_b2(J, I))
     end
 
     (zero(E0), tabulate(b1), tabulate(b2))
@@ -106,28 +132,36 @@ end
 const comm = comm2
 const generator = white
 
+Base.:+(a::TwoBodyARRAYOP, b::TwoBodyARRAYOP) = a .+ b
+Base.:*(a::Number, b::TwoBodyARRAYOP) = a .* b
+Base.:*(a::TwoBodyARRAYOP, b::Number) = a .* b
+Base.:/(a::TwoBodyARRAYOP, b::Number) = a ./ b
+Base.:\(a::Number, b::TwoBodyARRAYOP) = a .\ b
+Base.:-(a::TwoBodyARRAYOP) = .-a
+Base.:+(a::TwoBodyARRAYOP) = a
 ## Workaround so we can use isapprox()
 Base.:-(a::TwoBodyARRAYOP, b::TwoBodyARRAYOP) = a .- b
 function norm(op)
     E0, f, Γ = op
-    E0 + vecnorm(f.rep) + vecnorm(Γ.rep)
+    abs(E0) + LinearAlgebra.norm(f.rep) + LinearAlgebra.norm(Γ.rep)
 end
 
-function dΩ(Ω, params, s)
-    H0, rtol, atol, batchsize = params
-    prev_tot = ZERO_OP
-    prev_ad = generator(Ω, H0)
+factorial(T::Type{<:Number}, n::Integer) = prod(one(T):convert(T, n))
 
-    # Do first term
-    tot = bernoulli(Float64, 0)/factorial(Float64(0)) .* prev_ad
+function dΩ(Ω, h0)
+    @info "dΩ term: 0"
+    prev_tot = ZERO_OP
+    prev_ad = generator(Ω, h0)
+    tot = bernoulli(Float64, 0)/factorial(Float64, 0) * prev_ad
 
     n = 1
-    while !isapprox(tot, prev_tot, norm; rtol=rtol, atol=atol)
+    while norm(tot - prev_tot) > max(Ω_ATOL, Ω_RTOL*norm(tot))
+        @info "dΩ term: $n"
         prev_tot = tot
-        tot += sum(n:n+batchsize-1) do i
-            bernoulli(Float64, i)/factorial(Float64(i)) .* (prev_ad = comm(Ω, prev_ad))
+        tot += sum(n:n+Ω_BATCHSIZE-1) do i
+            bernoulli(Float64, i)/factorial(Float64, i) * (prev_ad = comm(Ω, prev_ad))
         end
-        n += batchsize
+        n += Ω_BATCHSIZE
     end
 
     tot
@@ -150,7 +184,7 @@ function im_pairingH(g)
         -g/2*mask
     end
 
-    (E0, f, Γ)
+    (E0, tabulate(f), tabulate(Γ))
 end
 
 function to_mbop(op)
@@ -174,60 +208,43 @@ function to_mbop(op)
     end
 end
 
-function H(Ω, H0, params)
-    rtol, atol, batchsize = params
-
+function H(Ω, h0)
     prev_tot = ZERO_OP
-    prev_ad = comm(Ω, H0)
+    prev_ad = comm(Ω, h0)
 
     # First term
-    tot = 1/factorial(0).*prev_ad
+    tot = 1/factorial(Float64, 0) * prev_ad
 
     n = 1
-    while !isapprox(tot, prev_to, norm; rtol=rtol, atol=atol)
+    while norm(tot - prev_tot) > max(H_ATOL, H_RTOL*norm(tot))
         prev_tot = tot
-        tot += sum(n:n+batchsize-1) do i
-            1/factorial(Float64(i)) .* (prev_ad = comm(Ω, prev_ad))
+        tot += sum(n:n+H_BATCHSIZE-1) do i
+            1/factorial(Float64, i) * (prev_ad = comm(Ω, prev_ad))
         end
-        n += batchsize
+        n += H_BATCHSIZE
     end
 
     tot
 end
 
-const Ω_RTOL = 0.1
-const Ω_ATOL = 0.0
-const Ω_BATCHSIZE = 5
-const H_RTOL = 0.1
-const H_ATOL = 0.0
-const H_BATCHSIZE = 5
-const S_BIG_STEP = 1.0
-const S_SMALL_STEP = 0.1
-
-const ALG = Euler()
-function solve(h)
-    Ω_params = (h, Ω_RTOL, Ω_ATOL, Ω_BATCHSIZE)
-    H_params = (H_RTOL, H_ATOL, H_BATCHSIZE)
-
+function solve(h0)
     s = 0.0
     n = 0
-    integrator = ODEProblem(dΩ, ZERO_OP, (s, s+S_BIG_STEP), Ω_params) #=
-              =# |> x -> init(x, ALG, dt=S_SMALL_STEP)
-    solve!(integrator)
-    n += 1
+    Ω = ZERO_OP
+    h_prev = ZERO_OP
+    h = h0
 
-    h_prev = h
-    h = H(integrator.sol[end], h, H_params)
-
-    while !isapprox(h, h_prev, norm; rtol=H_RTOL, atol=H_ATOL)
-        if n >= MAX_ITERS
+    while norm(h - h_prev) > max(INT_ATOL, INT_RTOL*norm(h))
+        @info "Integration iter: $n"
+        if n >= MAX_INT_ITERS
             @warn "Iteration maximum exceeded in solve()" n s
             break
         end
+
         h_prev = h
-        s = s + S_BIG_STEP; add_tstop!(integrator, s+S_BIG_STEP)
-        solve!(integrator)
-        h = H(integrator.sol[end], h, H_params)
+        Ω += dΩ(Ω, h0) * S_SMALL_STEP
+        s += S_SMALL_STEP
+        h = H(Ω, h0)
     end
 
     h
