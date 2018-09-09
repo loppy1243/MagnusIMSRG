@@ -6,11 +6,11 @@ import LinearAlgebra
 import JuliaUtil
 #using OrdinaryDiffEq
 using Combinatorics: levicivita, combinations
-using JuliaUtil: cartesian_pow, bernoulli
+using JuliaUtil: cartesian_pow, bernoulli, @every
 
-### Workaround b/c no internet :(
-JuliaUtil.fbinom(a, b) =
-    factorial(Float64, a) / (factorial(Float64, b)*factorial(Float64, a-b))
+#### Workaround b/c no internet :(
+#JuliaUtil.fbinom(a, b) =
+#    factorial(Float64, a) / (factorial(Float64, b)*factorial(Float64, a-b))
 
 ### Parameters ###############################################################################
 const Ω_RTOL = 0.1
@@ -55,6 +55,7 @@ function _comm1(A, B)
     B0, B1, B2 = B
 
     FUNCOP(1)() do i, j
+        i, j = inner(i), inner(j)
         _comm1_1_2(A1, B2, i, j) + _comm1_2_2(A2, B2, i, j) - _comm1_1_2(B1, A2, i, j)
     end |> tabulate
 end
@@ -75,7 +76,7 @@ _comm0_2_2(A, B) = 4 \ sum(matrixiter(A)) do X
 end
 
 _comm1_1_2(A, B, i, j) = sum(matrixiter(A)) do X
-    a, b = X
+    a, b = map(inner, X)
 
     (isocc(a) - isocc(b))*A[a, b]*B[b, i, a, j]
 end
@@ -112,15 +113,18 @@ function white(Ω::TwoBodyARRAYOP, h0::TwoBodyARRAYOP)
 
     function _b1(i, j)
         x = isunocc(i)*isocc(j)*f[i, j]
-        iszero(x) ? x : x / Δ(i, j)
+        d = Δ(i, j)
+        iszero(d) ? d : x/d
     end
     function _b2(I, J)
         x = 4 \ isunocc(I)*isocc(J) * Γ[I, J]
-        iszero(x) ? x : x / Δ(I..., J...)
+        d = Δ(I..., J...)
+        iszero(d) ? d : x/d
     end
 
     b1 = FUNCOP(1)() do I, J
-        _b1(I..., J...) - conj(_b1(J..., I...))
+        i, j = inner(I), inner(J)
+        _b1(i, j) - conj(_b1(j, i))
     end
     b2 = FUNCOP(2)() do I, J
         _b2(I, J) - conj(_b2(J, I))
@@ -149,14 +153,14 @@ end
 factorial(T::Type{<:Number}, n::Integer) = prod(one(T):convert(T, n))
 
 function dΩ(Ω, h0)
-    @info "dΩ term: 0"
+    @info "dΩ term" n=0
     prev_tot = ZERO_OP
     prev_ad = generator(Ω, h0)
     tot = bernoulli(Float64, 0)/factorial(Float64, 0) * prev_ad
 
     n = 1
     while norm(tot - prev_tot) > max(Ω_ATOL, Ω_RTOL*norm(tot))
-        @info "dΩ term: $n"
+        @info "dΩ term" n
         prev_tot = tot
         tot += sum(n:n+Ω_BATCHSIZE-1) do i
             bernoulli(Float64, i)/factorial(Float64, i) * (prev_ad = comm(Ω, prev_ad))
@@ -173,6 +177,7 @@ function im_pairingH(g)
     end - g/2*FERMILEVEL^2
 
     f = FUNCOP(1)() do p, q
+        p, q = inner(p), inner(q)
         (p == q)*(LEVEL_SPACING*(level(p)-1) - g/2*FERMILEVEL)
     end
 
@@ -235,7 +240,8 @@ function solve(h0)
     h = h0
 
     while norm(h - h_prev) > max(INT_ATOL, INT_RTOL*norm(h))
-        @info "Integration iter: $n"
+        @info "Integration iter" n
+        @every 5 display(h)
         if n >= MAX_INT_ITERS
             @warn "Iteration maximum exceeded in solve()" n s
             break
@@ -245,6 +251,7 @@ function solve(h0)
         Ω += dΩ(Ω, h0) * S_SMALL_STEP
         s += S_SMALL_STEP
         h = H(Ω, h0)
+        n += 1
     end
 
     h
