@@ -5,8 +5,9 @@ import ManyBody.Operators
 import LinearAlgebra
 import JuliaUtil
 #using OrdinaryDiffEq
+using Base.Cartesian: @nloops
 using Combinatorics: levicivita, combinations
-using JuliaUtil: cartesian_pow, bernoulli, @every
+using JuliaUtil: bernoulli, @every
 
 #### Workaround b/c no internet :(
 #JuliaUtil.fbinom(a, b) =
@@ -27,6 +28,7 @@ const MAX_INT_ITERS = 100
 ##############################################################################################
 
 const SPBASIS = Bases.Pairing{4}
+const IXBASIS = indextype(SPBASIS)
 const REFSTATE = RefStates.Fermi(Bases.Pairing{4}, 2)
 const MBBASIS = Bases.Paired{2, 4}
 const ELTYPE = Float64
@@ -34,6 +36,7 @@ const ARRAYOP(N) = F64ArrayOperator{Bases.Product{N, NTuple{N, SPBASIS}}, 2N}
 const FUNCOP(N) = F64FunctionOperator{Bases.Product{N, NTuple{N, SPBASIS}}}
 const MBFUNCOP = F64FunctionOperator{MBBASIS}
 
+const DIM = dim(SPBASIS)
 const LEVEL_SPACING = 1.0
 const FERMILEVEL = fermilevel(REFSTATE)
 const ZERO_OP = (zero(ELTYPE), zero(ARRAYOP(1)), zero(ARRAYOP(2)))
@@ -63,9 +66,11 @@ function _comm2(A, B)
     A0, A1, A2 = A
     B0, B1, B2 = B
 
-    FUNCOP(2)() do I, J
-        _comm2_1_2(A1, B2, I, J) + _comm2_2_2(A2, B2, I, J) + _comm2_1_2(B1, A2, I, J)
+    op = FUNCOP(2)() do I, J
+        _comm2_1_2(A1, B2, I, J) + #=_comm2_2_2(A2, B2, I, J)=# + _comm2_1_2(B1, A2, I, J)
     end |> tabulate
+
+    op + ARRAYOP(2)(_comm2_2_2(A2, B2))
 end
 
 
@@ -80,10 +85,15 @@ _comm1_1_2(A, B, i, j) = sum(matrixiter(A)) do X
 
     (isocc(a) - isocc(b))*A[a, b]*B[b, i, a, j]
 end
-_comm1_2_2(A, B, i, j) = 2 \ sum(cartesian_pow(SPBASIS, Val{3})) do I
-    a, b, c = I
-    isunocc(a)*isunocc(b)*isocc(c) + isocc(a)*isocc(b)*isunocc(c) #=
- =# * (A[c, i, a, b]*B[a, b, c, j] - B[c, i, a, b]*A[a, b, c, j])
+function _comm1_2_2(A, B, i, j)
+    tot = zero(ELTYPE)
+    @nloops 3 a (_ -> SPBASIS) begin
+        tot += isunocc(a_1)*isunocc(a_2)*isocc(a_3) + isocc(a_1)*isocc(a_2)*isunocc(a_3) #=
+            =# * (A[a_3, i, a_1, a_2]*B[a_1, a_2, a_3, j] #=
+               =# - B[a_3, i, a_1, a_2]*A[a_1, a_2, a_3, j])
+    end
+
+    tot / 2
 end
 
 function _comm2_1_2(A, B, I, J)
@@ -93,15 +103,62 @@ function _comm2_1_2(A, B, I, J)
      =# - A[a, k]*B[i, j, a, l] + A[a, l]*B[i, j, a, k]
     end
 end
-function _comm2_2_2(A, B, I, J)
-    i, j = I; k, l = J
-    4 \ sum(cartesian_pow(SPBASIS, Val{2})) do I
-       a, b = I
-       2 \ (1-isocc(a)-isocc(b))*(A[i, j, a, b]*B[a, b, k, l] - B[i, j, a, b]*A[a, b, k, l]) #=
-    =# + (isocc(a)-isocc(b))*(A[a, i, b, k]*B[b, j, a, l] - A[a, j, b, k]*B[b, i, a, l] #=
-                           =# - A[a, i, b, l]*B[a, j, a, k] + A[a, j, b, l]*B[b, i, a, k])
+
+let MASK1(a, b) = 1 - isocc(a) - isocc(b),
+    MASK2(a, b) = isocc(a) - isocc(b),
+    DENSITY_MAT_1 = (b=basis(SPBASIS); MASK1.(b, b)),
+    DENSITY_MAT_2 = (b=basis(SPBASIS); MASK2.(b, b))
+global _comm2_2_2
+function _comm2_2_2(A, B#=, I, J=#)
+    to_mat(x) = reshape(x, DIM^2, DIM^2)
+
+    A′ = Array{ELTYPE}(undef, DIM^2, DIM^2)
+    B′ = Array{ELTYPE}(undef, DIM^2, DIM^2)
+
+    A′ .= to_mat(A.rep)
+    B′ .= to_mat(B.rep .* DENSITY_MAT_1)
+    C′ = A′*B′
+
+    A′ .= to_mat(A.rep .* DENSITY_MAT_1)
+    B′ .= to_mat(B.rep)
+    C′ .-= B′*A′
+    
+    C′ ./= 2
+
+    A′ .= to_mat(PermutedDimsArray(A.rep, [2, 4, 1, 3]))
+    B′ .= to_mat(PermutedDimsArray(B.rep, [3, 1, 2, 4]).*DENSITY_MAT_2)
+    D′ = A′*B′
+
+    A′ .= to_mat(PermutedDimsArray(A.rep, [1, 3, 2, 4]).*DENSITY_MAT_2)
+    B′ .= to_mat(PermutedDimsArray(B.rep, [3, 1, 2, 4]))
+    D′ .+= B′*A′
+
+    ret = reshape(C′, DIM, DIM, DIM, DIM)
+
+    for I in CartesianIndices(ret)
+        a, b, c, d = Tuple(I)
+        LI = LinearIndices((DIM, DIM))
+
+        ret[a, b, c, d] = (D′[LI[a, c], LI[b, d]] - D′[LI[a, d], LI[c, b]]) / 4
     end
-end
+
+    ret
+
+#    i, j = I; k, l = J
+#
+#    tot = zero(ELTYPE)
+#    @nloops 2 a (_ -> SPBASIS) begin
+#       tot += 2 \ (1-isocc(a_1)-isocc(a_2))*(A[i, j, a_1, a_2]*B[a_1, a_2, k, l] #=
+#                =# - B[i, j, a_1, a_2]*A[a_1, a_2, k, l]) #=
+#           =# + (isocc(a_1)-isocc(a_2))*(A[a_1, i, a_2, k]*B[a_2, j, a_1, l] #=
+#                                      =# - A[a_1, j, a_2, k]*B[a_2, i, a_1, l] #=
+                                                             # \___/ typo?
+#                                      =# - A[a_1, i, a_2, l]*B[a_1, j, a_1, k] #=
+#                                      =# + A[a_1, j, a_2, l]*B[a_2, i, a_1, k])
+#    end
+#
+#    tot / 4
+end end
 
 function white(Ω::TwoBodyARRAYOP, h0::TwoBodyARRAYOP)
     E0, f, Γ = H(Ω, h0)
@@ -232,7 +289,7 @@ function H(Ω, h0)
     tot
 end
 
-function solve(h0)
+function solve(h0; max_int_iters=MAX_INT_ITERS)
     s = 0.0
     n = 0
     Ω = ZERO_OP
@@ -241,8 +298,7 @@ function solve(h0)
 
     while norm(h - h_prev) > max(INT_ATOL, INT_RTOL*norm(h))
         @info "Integration iter" n
-        @every 5 display(h)
-        if n >= MAX_INT_ITERS
+        if n >= max_int_iters
             @warn "Iteration maximum exceeded in solve()" n s
             break
         end
