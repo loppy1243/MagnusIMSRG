@@ -127,9 +127,7 @@ version = "0.1.1"
 
 [[JuliaUtil]]
 deps = ["SpecialFunctions"]
-git-tree-sha1 = "bc007ba89e64753096f903d33fa44045a428de79"
-repo-rev = "master"
-repo-url = "/home/loppy/julia/pkg/JuliaUtil"
+path = "/home/loppy/julia/pkg/JuliaUtil"
 uuid = "e0285c20-9bfe-11e8-0cca-5f36c2b0fa53"
 version = "0.1.0"
 
