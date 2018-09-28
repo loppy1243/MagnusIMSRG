@@ -66,25 +66,32 @@ function _comm2(A, B)
     A0, A1, A2 = A
     B0, B1, B2 = B
 
-    op = FUNCOP(2)() do I, J
-        _comm2_1_2(A1, B2, I, J) + #=_comm2_2_2(A2, B2, I, J)=# + _comm2_1_2(B1, A2, I, J)
-    end |> tabulate
-
-    op + ARRAYOP(2)(_comm2_2_2(A2, B2))
+    ARRAYOP(2)(_comm2_1_2(A1, B2) + _comm2_2_2(A2, B2) + _comm2_1_2(B1, A2))
 end
-
 
 _comm0_2_2(A, B) = 4 \ sum(matrixiter(A)) do X
     I, J = X
 
     isocc(I)*isunocc(J)*(A[I, J]*B[J, I] - B[I, J]*A[J, I])
+    ## tr(A*B)
 end
 
-_comm1_1_2(A, B, i, j) = sum(matrixiter(A)) do X
-    a, b = map(inner, X)
+let MASK(a, b) = isocc(a) - isocc(b),
+    DENSITY_MAT = (b=basis(SPBASIS); MASK.(b, b))
+global _comm1_1_2
+function _comm1_1_2(A, B)
+    A′ = copy(reshape(DENSITY_MAT .* A.rep, DIM^2))
+    B′ = copy(reshape(PermutedDimsArray(B.rep, [1, 3, 2, 4]), DIM, DIM^3))
 
-    (isocc(a) - isocc(b))*A[a, b]*B[b, i, a, j]
-end
+    A'*B'
+end end
+### Pointwise version
+#_comm1_1_2(A, B, i, j) = sum(matrixiter(A)) do X
+#    a, b = map(inner, X)
+#
+#    (isocc(a) - isocc(b))*A[a, b]*B[b, i, a, j]
+#end
+
 function _comm1_2_2(A, B, i, j)
     tot = zero(ELTYPE)
     @nloops 3 a (_ -> SPBASIS) begin
@@ -96,12 +103,32 @@ function _comm1_2_2(A, B, i, j)
     tot / 2
 end
 
-function _comm2_1_2(A, B, I, J)
-    i, j = I; k, l = J
-    4 \ sum(SPBASIS) do a
-        A[i, a]*B[a, j, k, l] - A[j, a]*B[a, i, k, l] #=
-     =# - A[a, k]*B[i, j, a, l] + A[a, l]*B[i, j, a, k]
+function _comm2_1_2(A, B)
+    B′ = reshape(B.rep, DIM, DIM^3)
+    C = A.rep * B′
+
+    A′ = permutedims(A.rep, [2, 1])
+    B′ .= reshape(PermutedDimsArray(B.rep, [3, 2, 1, 4]), DIM, DIM^3)
+    D = A' * B′
+
+    ret = Array{ELTYPE}(undef, DIM, DIM, DIM, DIM)
+
+    for I in CartesianIndices(ret)
+        i, j, k, l = Tuple(I)
+        LI = LinearIndices((DIM, DIM, DIM))
+
+        ret[I] = 4 \ (C[i, LI[i, j, k]] - C[j, LI[i, k, l]]
+                      - D[k, LI[i, j, l]] + D[l, LI[j, i, k]])
     end
+
+    ret
+
+## Pointwise version
+#    i, j = I; k, l = J
+#    4 \ sum(SPBASIS) do a
+#        A[i, a]*B[a, j, k, l] - A[j, a]*B[a, i, k, l] #=
+#     =# - A[a, k]*B[i, j, a, l] + A[a, l]*B[i, j, a, k]
+#    end
 end
 
 let MASK1(a, b) = 1 - isocc(a) - isocc(b),
@@ -109,7 +136,7 @@ let MASK1(a, b) = 1 - isocc(a) - isocc(b),
     DENSITY_MAT_1 = (b=basis(SPBASIS); MASK1.(b, b)),
     DENSITY_MAT_2 = (b=basis(SPBASIS); MASK2.(b, b))
 global _comm2_2_2
-function _comm2_2_2(A, B#=, I, J=#)
+function _comm2_2_2(A, B)
     to_mat(x) = reshape(x, DIM^2, DIM^2)
 
     A′ = Array{ELTYPE}(undef, DIM^2, DIM^2)
@@ -125,12 +152,12 @@ function _comm2_2_2(A, B#=, I, J=#)
     
     C′ ./= 2
 
-    A′ .= to_mat(PermutedDimsArray(A.rep, [2, 4, 1, 3]))
-    B′ .= to_mat(PermutedDimsArray(B.rep, [3, 1, 2, 4]).*DENSITY_MAT_2)
+    A′ .= PermutedDimsArray(A.rep, [2, 4, 1, 3]) |> to_mat
+    B′ .= PermutedDimsArray(B.rep, [3, 1, 2, 4]).*DENSITY_MAT_2 |> to_mat
     D′ = A′*B′
 
-    A′ .= to_mat(PermutedDimsArray(A.rep, [1, 3, 2, 4]).*DENSITY_MAT_2)
-    B′ .= to_mat(PermutedDimsArray(B.rep, [3, 1, 2, 4]))
+    A′ .= PermutedDimsArray(A.rep, [1, 3, 2, 4]).*DENSITY_MAT_2 |> to_mat
+    B′ .= PermutedDimsArray(B.rep, [3, 1, 2, 4]) |> to_mat
     D′ .+= B′*A′
 
     ret = reshape(C′, DIM, DIM, DIM, DIM)
@@ -144,6 +171,7 @@ function _comm2_2_2(A, B#=, I, J=#)
 
     ret
 
+## Pointwise version
 #    i, j = I; k, l = J
 #
 #    tot = zero(ELTYPE)
@@ -152,7 +180,7 @@ function _comm2_2_2(A, B#=, I, J=#)
 #                =# - B[i, j, a_1, a_2]*A[a_1, a_2, k, l]) #=
 #           =# + (isocc(a_1)-isocc(a_2))*(A[a_1, i, a_2, k]*B[a_2, j, a_1, l] #=
 #                                      =# - A[a_1, j, a_2, k]*B[a_2, i, a_1, l] #=
-                                                             # \___/ typo?
+#                                                            # \___/ typo?
 #                                      =# - A[a_1, i, a_2, l]*B[a_1, j, a_1, k] #=
 #                                      =# + A[a_1, j, a_2, l]*B[a_2, i, a_1, k])
 #    end
