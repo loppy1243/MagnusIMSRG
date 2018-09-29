@@ -28,6 +28,7 @@ const MAX_INT_ITERS = 100
 ##############################################################################################
 
 const SPBASIS = Bases.Pairing{4}
+const spbasis = basis(SPBASIS)
 const IXBASIS = indextype(SPBASIS)
 const REFSTATE = RefStates.Fermi(Bases.Pairing{4}, 2)
 const MBBASIS = Bases.Paired{2, 4}
@@ -47,6 +48,16 @@ isocc(x) = ManyBody.isocc(REFSTATE, x)
 isunocc(x) = ManyBody.isocc(REFSTATE, x)
 normord(x) = ManyBody.normord(REFSTATE, x)
 
+### Density Matrices #########################################################################
+# hole*particle or -(particle*hole)
+const DMAT_HmH = [isocc(a)-isocc(b) for a in SPBASIS, b in SPBASIS]
+# particle*particle or -(hole*hole)
+const DMAT_1mHmH = [1-isocc(a)-isocc(b) for a in SPBASIS, b in SPBASIS]
+# particle*particle*hole + hole*hole*particle
+const DMAT_PPHpHHP = [isunocc(a)*isunocc(b)*isocc(c) + isocc(a)*isocc(b)*isunocc(c)
+                      for a in SPBASIS, b in SPBASIS, c in SPBASIS]
+##############################################################################################
+
 nbody(A, n) = A[n+1]
 
 comm2(A::TwoBodyARRAYOP, B::TwoBodyARRAYOP) =
@@ -57,10 +68,7 @@ function _comm1(A, B)
     A0, A1, A2 = A
     B0, B1, B2 = B
 
-    FUNCOP(1)() do i, j
-        i, j = inner(i), inner(j)
-        _comm1_1_2(A1, B2, i, j) + _comm1_2_2(A2, B2, i, j) - _comm1_1_2(B1, A2, i, j)
-    end |> tabulate
+    ARRAYOP(1)(_comm1_1_2(A1, B2) + _comm1_2_2(A2, B2) - _comm1_1_2(B1, A2))
 end
 function _comm2(A, B)
     A0, A1, A2 = A
@@ -69,56 +77,68 @@ function _comm2(A, B)
     ARRAYOP(2)(_comm2_1_2(A1, B2) + _comm2_2_2(A2, B2) + _comm2_1_2(B1, A2))
 end
 
+## Pointwise version
 _comm0_2_2(A, B) = 4 \ sum(matrixiter(A)) do X
     I, J = X
 
     isocc(I)*isunocc(J)*(A[I, J]*B[J, I] - B[I, J]*A[J, I])
-    ## tr(A*B)
 end
 
-let MASK(a, b) = isocc(a) - isocc(b),
-    DENSITY_MAT = (b=basis(SPBASIS); MASK.(b, b))
-global _comm1_1_2
 function _comm1_1_2(A, B)
-    A′ = copy(reshape(DENSITY_MAT .* A.rep, DIM^2))
-    B′ = copy(reshape(PermutedDimsArray(B.rep, [1, 3, 2, 4]), DIM, DIM^3))
+    A′ = reshape(A.rep.*DMAT_HmH, DIM^2)
+    B′ = reshape(permutedims(B.rep, [2, 4, 3, 1]), DIM^2, DIM^2)
 
-    A'*B'
-end end
+    reshape(B′*A′, DIM, DIM)
+end
 ### Pointwise version
 #_comm1_1_2(A, B, i, j) = sum(matrixiter(A)) do X
-#    a, b = map(inner, X)
+#    a, b = X
 #
 #    (isocc(a) - isocc(b))*A[a, b]*B[b, i, a, j]
 #end
 
-function _comm1_2_2(A, B, i, j)
-    tot = zero(ELTYPE)
-    @nloops 3 a (_ -> SPBASIS) begin
-        tot += isunocc(a_1)*isunocc(a_2)*isocc(a_3) + isocc(a_1)*isocc(a_2)*isunocc(a_3) #=
-            =# * (A[a_3, i, a_1, a_2]*B[a_1, a_2, a_3, j] #=
-               =# - B[a_3, i, a_1, a_2]*A[a_1, a_2, a_3, j])
-    end
+function _comm1_2_2(A, B)
+    A′ = reshape(PermutedDimsArray(A.rep, [2, 3, 4, 1]), DIM, DIM^3) |> copy
+    B′ = reshape(B.rep.*DMAT_PPHpHHP, DIM^3, DIM)
+    C′ = A′*B′
 
-    tot / 2
+    # NOTE: here we have A -> B′ and B -> A′
+    B′ .= reshape(A.rep.*DMAT_PPHpHHP, DIM^3, DIM)
+    A′ .= reshape(PermutedDimsArray(B.rep, [2, 3, 4, 1]), DIM, DIM^3)
+    C′ .-= A′*B′
+
+    C′ ./= 2
+
+    reshape(C′, DIM, DIM)
+
+### Pointwise version
+#    tot = zero(ELTYPE)
+#    @nloops 3 a (_ -> SPBASIS) begin
+#        tot += (isunocc(a_1)*isunocc(a_2)*isocc(a_3) + isocc(a_1)*isocc(a_2)*isunocc(a_3)) #=
+#            =# * (A[a_3, i, a_1, a_2]*B[a_1, a_2, a_3, j] #=
+#               =# - B[a_3, i, a_1, a_2]*A[a_1, a_2, a_3, j])
+#    end
+#
+#    tot / 2
 end
 
 function _comm2_1_2(A, B)
-    B′ = reshape(B.rep, DIM, DIM^3)
-    C = A.rep * B′
+    B′ = reshape(B.rep, DIM, DIM^3) |> copy
+    C′ = A.rep * B′
 
-    A′ = permutedims(A.rep, [2, 1])
-    B′ .= reshape(PermutedDimsArray(B.rep, [3, 2, 1, 4]), DIM, DIM^3)
-    D = A' * B′
+    B′ = reshape(permutedims(B.rep, [1, 2, 4, 3]), DIM^3, DIM)
+    D′ = B′ * A.rep
+
+    # Type unstable?
+    C′ = reshape(C′, DIM, DIM, DIM, DIM)
+    D′ = reshape(D′, DIM, DIM, DIM, DIM)
 
     ret = Array{ELTYPE}(undef, DIM, DIM, DIM, DIM)
 
     for I in CartesianIndices(ret)
         i, j, k, l = Tuple(I)
-        LI = LinearIndices((DIM, DIM, DIM))
 
-        ret[I] = 4 \ (C[i, LI[i, j, k]] - C[j, LI[i, k, l]]
-                      - D[k, LI[i, j, l]] + D[l, LI[j, i, k]])
+        ret[I] = 4 \ (C′[i, j, k, l] - C′[j, i, k, l] - D′[i, j, l, k] + D′[i, j, k, l])
     end
 
     ret
@@ -126,16 +146,10 @@ function _comm2_1_2(A, B)
 ## Pointwise version
 #    i, j = I; k, l = J
 #    4 \ sum(SPBASIS) do a
-#        A[i, a]*B[a, j, k, l] - A[j, a]*B[a, i, k, l] #=
-#     =# - A[a, k]*B[i, j, a, l] + A[a, l]*B[i, j, a, k]
+#        [1-P(i, j)]*A[i, a]*B[a, j, k, l] - [1-P(k, l)]*A[a, k]*B[i, j, a, l]
 #    end
 end
 
-let MASK1(a, b) = 1 - isocc(a) - isocc(b),
-    MASK2(a, b) = isocc(a) - isocc(b),
-    DENSITY_MAT_1 = (b=basis(SPBASIS); MASK1.(b, b)),
-    DENSITY_MAT_2 = (b=basis(SPBASIS); MASK2.(b, b))
-global _comm2_2_2
 function _comm2_2_2(A, B)
     to_mat(x) = reshape(x, DIM^2, DIM^2)
 
@@ -143,30 +157,26 @@ function _comm2_2_2(A, B)
     B′ = Array{ELTYPE}(undef, DIM^2, DIM^2)
 
     A′ .= to_mat(A.rep)
-    B′ .= to_mat(B.rep .* DENSITY_MAT_1)
+    B′ .= to_mat(B.rep .* DMAT_1mHmH)
     C′ = A′*B′
 
-    A′ .= to_mat(A.rep .* DENSITY_MAT_1)
+    A′ .= to_mat(A.rep .* DMAT_1mHmH)
     B′ .= to_mat(B.rep)
     C′ .-= B′*A′
-    
-    C′ ./= 2
+    C′ ./= 8
 
-    A′ .= PermutedDimsArray(A.rep, [2, 4, 1, 3]) |> to_mat
-    B′ .= PermutedDimsArray(B.rep, [3, 1, 2, 4]).*DENSITY_MAT_2 |> to_mat
-    D′ = A′*B′
-
-    A′ .= PermutedDimsArray(A.rep, [1, 3, 2, 4]).*DENSITY_MAT_2 |> to_mat
-    B′ .= PermutedDimsArray(B.rep, [3, 1, 2, 4]) |> to_mat
-    D′ .+= B′*A′
+    A′ .= PermutedDimsArray(A.rep, [1, 3, 2, 4]).*DMAT_HmH |> to_mat
+    B′ .= PermutedDimsArray(B.rep, [4, 2, 3, 1]) |> to_mat
+    D′ = B′*A′
 
     ret = reshape(C′, DIM, DIM, DIM, DIM)
+    # Type instability? Shouldn't be...
+    D′ = reshape(D′, DIM, DIM, DIM, DIM)
 
     for I in CartesianIndices(ret)
-        a, b, c, d = Tuple(I)
-        LI = LinearIndices((DIM, DIM))
+        i, j, k, l = Tuple(I)
 
-        ret[a, b, c, d] = (D′[LI[a, c], LI[b, d]] - D′[LI[a, d], LI[c, b]]) / 4
+        ret[I] += 4 \ (D′[i, j, k, l] - D′[j, i, k, l] + D′[j, i, l, k])
     end
 
     ret
@@ -178,15 +188,12 @@ function _comm2_2_2(A, B)
 #    @nloops 2 a (_ -> SPBASIS) begin
 #       tot += 2 \ (1-isocc(a_1)-isocc(a_2))*(A[i, j, a_1, a_2]*B[a_1, a_2, k, l] #=
 #                =# - B[i, j, a_1, a_2]*A[a_1, a_2, k, l]) #=
-#           =# + (isocc(a_1)-isocc(a_2))*(A[a_1, i, a_2, k]*B[a_2, j, a_1, l] #=
-#                                      =# - A[a_1, j, a_2, k]*B[a_2, i, a_1, l] #=
-#                                                            # \___/ typo?
-#                                      =# - A[a_1, i, a_2, l]*B[a_1, j, a_1, k] #=
-#                                      =# + A[a_1, j, a_2, l]*B[a_2, i, a_1, k])
+#           =# + (isocc(a_1)-isocc(a_2))*[1-P(i, j)-P(k, l)+P(i, j)*P(k, l)] #=
+#                *A[a_1, i, a_2, k]*B[a_2, j, a_1, l]
 #    end
 #
 #    tot / 4
-end end
+end
 
 function white(Ω::TwoBodyARRAYOP, h0::TwoBodyARRAYOP)
     E0, f, Γ = H(Ω, h0)
