@@ -13,7 +13,7 @@ const DMAT_PPHpHHP = [isunocc(a)*isunocc(b)*isocc(c) + isocc(a)*isocc(b)*isunocc
 comm2(A::TwoBodyARRAYOP, B::TwoBodyARRAYOP) =
     (_comm0(A, B), _comm1(A, B), _comm2(A, B))
 comm2_pw(A::TwoBodyARRAYOP, B::TwoBodyARRAYOP) =
-    (_comm0_pw(A, B), _comm1_pw(A, B), _comm2(A, B))
+    (_comm0_pw(A, B), _comm1_pw(A, B), _comm2_pw(A, B))
 
 _comm0(A, B) = _comm0_2_2(nbody(A, 2), nbody(B, 2))
 _comm0_pw(A, B) = _comm0_2_2_pw(nbody(A, 2), nbody(B, 2))
