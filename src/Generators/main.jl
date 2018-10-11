@@ -25,6 +25,26 @@ end
 end # module OnceMacro
 using .OnceMacro: @once
 
+function H(Ω, h0)
+    @debug "H term" n=0
+    prev_tot = ZERO_OP
+    prev_ad = h0
+
+    # First term
+    tot = 1/factorial(Float64, 0) * prev_ad
+
+    n = 1
+    while norm(tot - prev_tot) > max(H_ATOL, H_RTOL*norm(tot))
+        @debug "H term" n
+        prev_tot = tot
+        tot += sum(n:n+H_BATCHSIZE-1) do i
+            1/factorial(Float64, i) * (prev_ad = comm(Ω, prev_ad))
+        end
+        n += H_BATCHSIZE
+    end
+tot
+end
+
 function white(Ω::TwoBodyARRAYOP, h0::TwoBodyARRAYOP)
     E0, f, Γ = H(Ω, h0)
 
