@@ -152,26 +152,26 @@ function _comm2_2_2(A, B)
     B′ .= PermutedDimsArray(B.rep, [4, 2, 3, 1]) |> to_mat
     D′ = B′*A′
 
-    ret = reshape(C′, DIM, DIM, DIM, DIM)
-    # Type instability? Shouldn't be...
+    # Type instability?
+    C′ = reshape(C′, DIM, DIM, DIM, DIM)
     D′ = reshape(D′, DIM, DIM, DIM, DIM)
 
     for I in CartesianIndices(ret)
         i, j, k, l = Tuple(I)
 
-        ret[I] += 4 \ (D′[i, j, k, l] - D′[j, i, k, l] + D′[j, i, l, k])
+        C′[I] += 4 \ (D′[j, l, i, k] - D′[i, l, j, k] - D′[j, k, i, l] + D′[i, k, j, l])
     end
 
-    ret
+    C′
 end
 function _comm2_2_2_pw(A, B, i, j, k, l)
     tot = zero(ELTYPE)
-    @nloops 2 a (_ -> SPBASIS) begin
-        prod3(i, j, k, l) = A[a_1, i, a_2, k]*B[a_2, j, a_1, l]
+    for a in SPBASIS, b in SPBASIS
+        prod3(i, j, k, l) = A[a, i, b, k]*B[b, j, a, l]
 
-        tot += 2 \ (1-isocc(a_1)-isocc(a_2))*(A[i, j, a_1, a_2]*B[a_1, a_2, k, l] #=
-                 =# - B[i, j, a_1, a_2]*A[a_1, a_2, k, l]) #=
-            =# + (isocc(a_1)-isocc(a_2)) #=
+        tot += 2 \ (1-isocc(a)-isocc(b))*(A[i, j, a, b]*B[a, b, k, l] #=
+                 =# - B[i, j, a, b]*A[a, b, k, l]) #=
+            =# + (isocc(a)-isocc(b)) #=
               =# * (prod3(i, j, k, l) - prod3(j, i, k, l) + prod3(j, i, l, k))
     end
 
