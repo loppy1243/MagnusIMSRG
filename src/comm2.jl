@@ -1,4 +1,3 @@
-import LinearAlgebra
 using Base.Cartesian
 
 ### Density Matrices #########################################################################
