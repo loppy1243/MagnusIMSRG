@@ -1,3 +1,6 @@
+import LinearAlgebra
+using Base.Cartesian
+
 ### Density Matrices #########################################################################
 # hole*particle or -(particle*hole)
 const DMAT_HmH = [isocc(a)-isocc(b) for a in SPBASIS, b in SPBASIS]
@@ -10,27 +13,59 @@ const DMAT_PPHpHHP = [isunocc(a)*isunocc(b)*isocc(c) + isocc(a)*isocc(b)*isunocc
 
 comm2(A::TwoBodyARRAYOP, B::TwoBodyARRAYOP) =
     (_comm0(A, B), _comm1(A, B), _comm2(A, B))
+comm2_pw(A::TwoBodyARRAYOP, B::TwoBodyARRAYOP) =
+    (_comm0_pw(A, B), _comm1_pw(A, B), _comm2(A, B))
 
 _comm0(A, B) = _comm0_2_2(nbody(A, 2), nbody(B, 2))
+_comm0_pw(A, B) = _comm0_2_2_pw(nbody(A, 2), nbody(B, 2))
+
 function _comm1(A, B)
     A0, A1, A2 = A
     B0, B1, B2 = B
 
     ARRAYOP(1)(_comm1_1_2(A1, B2) + _comm1_2_2(A2, B2) - _comm1_1_2(B1, A2))
 end
+function _comm1_pw(A, B)
+    A0, A1, A2 = A
+    B0, B1, B2 = B
+
+    ret = Array{ELTYPE}(undef, DIM, DIM)
+
+    for i in SPBASIS, j in SPBASIS
+        ret[index(i), index(j)] =
+            _comm1_1_2_pw(A1, B2, i, j) + _comm1_2_2_pw(A2, B2, i, j) #=
+         =# - _comm1_1_2_pw(B1, A2, i, j)
+    end
+
+    ARRAYOP(1)(ret)
+end
+
 function _comm2(A, B)
     A0, A1, A2 = A
     B0, B1, B2 = B
 
-    ARRAYOP(2)(_comm2_1_2(A1, B2) + _comm2_2_2(A2, B2) + _comm2_1_2(B1, A2))
+    ARRAYOP(2)(_comm2_1_2(A1, B2) + _comm2_2_2(A2, B2) - _comm2_1_2(B1, A2))
+end
+function _comm2_pw(A, B)
+    A0, A1, A2 = A
+    B0, B1, B2 = B
+
+    ret = Array{ELTYPE}(undef, DIM, DIM, DIM, DIM)
+    @nloops 4 i (_ -> SPBASIS) begin
+        @nref(4, ret, d -> index(i_d)) =
+            @ncall(4, _comm2_1_2_pw, A1, B2, i) + @ncall(4, _comm2_2_2_pw, A2, B2, i) #=
+         =# - @ncall(4, _comm2_1_2_pw, B1, A2, i)
+    end
+
+    ARRAYOP(2)(ret)
 end
 
-## Pointwise version
 _comm0_2_2(A, B) = 4 \ sum(matrixiter(A)) do X
     I, J = X
 
     all(isocc, I)*all(isunocc, J)*(A[I, J]*B[J, I] - B[I, J]*A[J, I])
 end
+const _comm0_2_2_pw = _comm0_2_2
 
 function _comm1_1_2(A, B)
     A′ = reshape(A.rep.*DMAT_HmH, DIM^2)
@@ -38,12 +73,11 @@ function _comm1_1_2(A, B)
 
     reshape(B′*A′, DIM, DIM)
 end
-### Pointwise version
-#_comm1_1_2(A, B, i, j) = sum(matrixiter(A)) do X
-#    a, b = X
-#
-#    (isocc(a) - isocc(b))*A[a, b]*B[b, i, a, j]
-#end
+_comm1_1_2_pw(A, B, i, j) = sum(matrixiter(A)) do X
+    a, b = X
+
+    (isocc(a)-isocc(b))*A[a, b]*B[b, i, a, j]
+end
 
 function _comm1_2_2(A, B)
     A′ = reshape(PermutedDimsArray(A.rep, [2, 3, 4, 1]), DIM, DIM^3) |> copy
@@ -59,15 +93,16 @@ function _comm1_2_2(A, B)
 
     reshape(C′, DIM, DIM)
 
-### Pointwise version
-#    tot = zero(ELTYPE)
-#    @nloops 3 a (_ -> SPBASIS) begin
-#        tot += (isunocc(a_1)*isunocc(a_2)*isocc(a_3) + isocc(a_1)*isocc(a_2)*isunocc(a_3)) #=
-#            =# * (A[a_3, i, a_1, a_2]*B[a_1, a_2, a_3, j] #=
-#               =# - B[a_3, i, a_1, a_2]*A[a_1, a_2, a_3, j])
-#    end
-#
-#    tot / 2
+end
+function _comm1_2_2_pw(A, B, i, j)
+    tot = zero(ELTYPE)
+    @nloops 3 a (_ -> SPBASIS) begin
+        tot += (isunocc(a_1)*isunocc(a_2)*isocc(a_3) + isocc(a_1)*isocc(a_2)*isunocc(a_3)) #=
+            =# * (A[a_3, i, a_1, a_2]*B[a_1, a_2, a_3, j] #=
+               =# - B[a_3, i, a_1, a_2]*A[a_1, a_2, a_3, j])
+    end
+
+    tot / 2
 end
 
 function _comm2_1_2(A, B)
@@ -91,11 +126,12 @@ function _comm2_1_2(A, B)
 
     ret
 
-## Pointwise version
-#    i, j = I; k, l = J
-#    4 \ sum(SPBASIS) do a
-#        [1-P(i, j)]*A[i, a]*B[a, j, k, l] - [1-P(k, l)]*A[a, k]*B[i, j, a, l]
-#    end
+end
+_comm2_1_2_pw(A, B, i, j, k, l) = 4 \ sum(SPBASIS) do a
+    prod1(i, j, k, l) = A[i, a]*B[a, j, k, l]
+    prod2(i, j, k, l) = A[a, k]*B[i, j, a, l]
+
+    prod1(i, j, k, l) - prod1(j, i, k, l) - prod2(i, j, k, l) + prod2(i, j, l, k)
 end
 
 function _comm2_2_2(A, B)
@@ -128,17 +164,17 @@ function _comm2_2_2(A, B)
     end
 
     ret
+end
+function _comm2_2_2_pw(A, B, i, j, k, l)
+    tot = zero(ELTYPE)
+    @nloops 2 a (_ -> SPBASIS) begin
+        prod3(i, j, k, l) = A[a_1, i, a_2, k]*B[a_2, j, a_1, l]
 
-## Pointwise version
-#    i, j = I; k, l = J
-#
-#    tot = zero(ELTYPE)
-#    @nloops 2 a (_ -> SPBASIS) begin
-#       tot += 2 \ (1-isocc(a_1)-isocc(a_2))*(A[i, j, a_1, a_2]*B[a_1, a_2, k, l] #=
-#                =# - B[i, j, a_1, a_2]*A[a_1, a_2, k, l]) #=
-#           =# + (isocc(a_1)-isocc(a_2))*[1-P(i, j)-P(k, l)+P(i, j)*P(k, l)] #=
-#                *A[a_1, i, a_2, k]*B[a_2, j, a_1, l]
-#    end
-#
-#    tot / 4
+        tot += 2 \ (1-isocc(a_1)-isocc(a_2))*(A[i, j, a_1, a_2]*B[a_1, a_2, k, l] #=
+                 =# - B[i, j, a_1, a_2]*A[a_1, a_2, k, l]) #=
+            =# + (isocc(a_1)-isocc(a_2)) #=
+              =# * (prod3(i, j, k, l) - prod3(j, i, k, l) + prod3(j, i, l, k))
+    end
+
+    tot / 4
 end
