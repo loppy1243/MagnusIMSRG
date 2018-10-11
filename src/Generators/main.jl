@@ -1,52 +1,13 @@
 module Generators
 using ManyBody
-using ..TwoBodyARRAYOP, ..isocc, ..isunocc, ..FUNCOP
+using ..SIGNAL_OPS, ..TwoBodyARRAYOP, ..isocc, ..isunocc, ..FUNCOP, ..H
 
-module OnceMacro
-export @once
-const _DONE = Dict{Symbol, Bool}()
-macro once(expr)
-    key = esc(gensym())
-    quote
-        if !get(_DONE, $key, false)
-            $(esc(expr))
-            nothing
-        else
-            _DONE[$key] = true
-        end
-    end
-end
+SIGNAL_OPS && include("../signalops.jl")
 
-function __init()__
-    for k in keys(_DONE)
-        _DONE[k] = false
-    end
-end
-end # module OnceMacro
-using .OnceMacro: @once
-
-function H(Ω, h0)
-    @debug "H term" n=0
-    prev_tot = ZERO_OP
-    prev_ad = h0
-
-    # First term
-    tot = 1/factorial(Float64, 0) * prev_ad
-
-    n = 1
-    while norm(tot - prev_tot) > max(H_ATOL, H_RTOL*norm(tot))
-        @debug "H term" n
-        prev_tot = tot
-        tot += sum(n:n+H_BATCHSIZE-1) do i
-            1/factorial(Float64, i) * (prev_ad = comm(Ω, prev_ad))
-        end
-        n += H_BATCHSIZE
-    end
-tot
-end
-
-function white(Ω::TwoBodyARRAYOP, h0::TwoBodyARRAYOP)
-    E0, f, Γ = H(Ω, h0)
+let EMIT_ZERO_WARNING_1=true, EMIT_ZERO_WARNING_2=true
+global white
+function white(Ω::TwoBodyARRAYOP, h::TwoBodyARRAYOP)
+    E0, f, Γ = h
 
     Δ(i, k) = f[i, i] - f[k, k] + Γ[i, k, i, k]
     Δ(i, j, k, l) =
@@ -54,25 +15,27 @@ function white(Ω::TwoBodyARRAYOP, h0::TwoBodyARRAYOP)
      =# - Γ[i, k, i, k] - Γ[j, l, j, l] - Γ[i, l, i, l] - Γ[j, k, j, k]
 
     function _b1(I, J)
-        mask = isunocc(I)*isocc(J)
-        x = mask*f[I, J]
         d = Δ(I..., J...)
         if iszero(d)
-            @once @warn("One-body energy denominator is zero! Will not warn again.")
+            if EMIT_ZERO_WARNING_1
+                @warn("One-body energy denominator is zero! Will not warn again.")
+                EMIT_ZERO_WARNING_1 = false
+            end
             d
         else
-            x/d
+            isunocc(I)*isocc(J)*f[I, J] / d
         end
     end
     function _b2(I, J)
-        mask = all(isunocc, I)*all(isocc, J)
-        x = mask * Γ[I, J] / 4
         d = Δ(I..., J...)
         if iszero(d)
-            @once @warn("Two-body energy denominator is zero! Will not warn again.")
+            if EMIT_ZERO_WARNING_2
+                @warn("Two-body energy denominator is zero! Will not warn again.")
+                EMIT_ZERO_WARNING_2 = false
+            end
             d
         else
-            x/d
+            4 \ all(isunocc, I)*all(isocc, J)*Γ[I, J] / d
         end
     end
 
@@ -85,6 +48,6 @@ function white(Ω::TwoBodyARRAYOP, h0::TwoBodyARRAYOP)
     end
 
     (zero(E0), tabulate(b1), tabulate(b2))
-end
+end end
 
 end # module Generators

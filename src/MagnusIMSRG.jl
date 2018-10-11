@@ -11,14 +11,18 @@ using JuliaUtil: bernoulli, @every
 #JuliaUtil.fbinom(a, b) =
 #    factorial(Float64, a) / (factorial(Float64, b)*factorial(Float64, a-b))
 
+##############################################################################################
+### Flags ####################################################################################
+const SIGNAL_OPS = false
+##############################################################################################
 ### Parameters ###############################################################################
-const Ω_RTOL = 0.1
-const Ω_ATOL = 0.0
+const Ω_RTOL = 0.0
+const Ω_ATOL = 0.01
 const Ω_BATCHSIZE = 5
 const H_RTOL = 0.0
-const H_ATOL = 0.005
+const H_ATOL = 0.01
 const INT_RTOL = 0.0
-const INT_ATOL = 0.0001
+const INT_ATOL = 0.001
 const H_BATCHSIZE = 5
 const S_BIG_STEP = 1.0
 const S_SMALL_STEP = 0.01
@@ -43,6 +47,7 @@ isocc(x) = ManyBody.isocc(REFSTATE, x)
 isunocc(x) = ManyBody.isocc(REFSTATE, x)
 normord(x) = ManyBody.normord(REFSTATE, x)
 
+SIGNAL_OPS && include("signalops.jl")
 include("nbodyops.jl")
 include("comm2.jl")
 include("hamiltonians.jl")
@@ -53,15 +58,14 @@ const generator = Generators.white
 
 factorial(T::Type{<:Number}, n::Integer) = prod(one(T):convert(T, n))
 
-function dΩ(Ω, h0)
+function dΩ(Ω, h0, h)
     @debug "dΩ term" n=0
     prev_tot = ZERO_OP
-    prev_ad = generator(Ω, h0)
+    prev_ad = generator(Ω, h0, h)
     tot = bernoulli(Float64, 0)/factorial(Float64, 0) * prev_ad
 
     n = 1
     while norm(tot - prev_tot) > max(Ω_ATOL, Ω_RTOL*norm(tot))
-        @debug "dΩ term" n
         prev_tot = tot
         tot += sum(n:n+Ω_BATCHSIZE-1) do i
             bernoulli(Float64, i)/factorial(Float64, i) * (prev_ad = comm(Ω, prev_ad))
@@ -79,7 +83,7 @@ function solve(h0; max_int_iters=MAX_INT_ITERS)
     h_prev = ZERO_OP
     h = h0
 
-    while @show(norm(h - h_prev)) > max(INT_ATOL, INT_RTOL*norm(h))
+    while norm(h - h_prev) > max(INT_ATOL, INT_RTOL*norm(h))
         @debug "Integration iter" n
         if n >= max_int_iters
             @warn "Iteration maximum exceeded in solve()" n s
@@ -87,7 +91,7 @@ function solve(h0; max_int_iters=MAX_INT_ITERS)
         end
 
         h_prev = h
-        Ω += dΩ(Ω, h0) * S_SMALL_STEP
+        Ω += dΩ(Ω, h0, h) * S_SMALL_STEP
         s += S_SMALL_STEP
         h = H(Ω, h0)
         n += 1
