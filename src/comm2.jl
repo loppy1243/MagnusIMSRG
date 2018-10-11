@@ -156,7 +156,7 @@ function _comm2_2_2(A, B)
     C′ = reshape(C′, DIM, DIM, DIM, DIM)
     D′ = reshape(D′, DIM, DIM, DIM, DIM)
 
-    for I in CartesianIndices(ret)
+    for I in CartesianIndices(C′)
         i, j, k, l = Tuple(I)
 
         C′[I] += 4 \ (D′[j, l, i, k] - D′[i, l, j, k] - D′[j, k, i, l] + D′[i, k, j, l])
