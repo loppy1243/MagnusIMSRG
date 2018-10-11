@@ -2,10 +2,8 @@ module MagnusIMSRG
 
 using ManyBody
 import ManyBody.Operators
-import LinearAlgebra
 import JuliaUtil
 #using OrdinaryDiffEq
-using Base.Cartesian: @nloops
 using Combinatorics: levicivita, combinations
 using JuliaUtil: bernoulli, @every
 
@@ -30,7 +28,7 @@ const MAX_INT_ITERS = 100
 const SPBASIS = Bases.Pairing{4}
 const spbasis = basis(SPBASIS)
 const IXBASIS = indextype(SPBASIS)
-const REFSTATE = RefStates.Fermi(Bases.Pairing{4}, 2)
+const REFSTATE = RefStates.Fermi(SPBASIS, 2)
 const MBBASIS = Bases.Paired{2, 4}
 const ELTYPE = Float64
 const ARRAYOP(N) = F64ArrayOperator{Bases.Product{N, NTuple{N, SPBASIS}}, 2N}
