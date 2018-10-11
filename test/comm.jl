@@ -20,4 +20,18 @@ commtest(; atol) = @testset "Commutators" begin
     @test abs(mat_E - pw_E) < atol
     @test all(abs.(mat_f.rep .- pw_f.rep) .< atol)
     @test all(abs.(mat_Γ.rep .- pw_Γ.rep) .< atol)
+
+    E0_1 = 0.0
+    f_1 .= 0.0
+    Γ_1 .= 0.0
+
+    op_1 = (E0_1, ARRAYOP(1)(f_1), ARRAYOP(2)(Γ_1))
+
+    mbop_1 = to_mbop(op_1) |> tabulate
+
+    mat_E, mat_f, mat_Γ = comm2(op_1, op_2)
+
+    @test abs(mat_E) < atol
+    @test all(abs.(mat_f.rep) .< atol)
+    @test all(abs.(mat_Γ.rep) .< atol)
 end
