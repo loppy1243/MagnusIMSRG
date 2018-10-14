@@ -37,3 +37,25 @@ function to_mbop(op)
         b0 + b1 + b2
     end
 end
+
+function mbdiag(op)
+    E0, f, Γ = op
+
+    ret = fill(E0, dim(MBBASIS))
+
+    for ((p,), (q,)) in matrixiter(f)
+        NA = normord(Operators.A(p', q))
+        for X in MBBASIS
+            ret[index(X)] += f[p, q]*(X'NA(X))
+        end
+    end
+    for (I, J) in matrixiter(Γ)
+        p, q = I; r, s = J
+        NA = normord(Operators.A(p', q', s, r))
+        for X in MBBASIS
+            ret[index(X)] += Γ[I, J]*(X'NA(X))
+        end
+    end
+
+    ret
+end
