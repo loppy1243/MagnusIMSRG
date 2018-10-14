@@ -23,7 +23,8 @@ function _comm1(A, B)
     A0, A1, A2 = A
     B0, B1, B2 = B
 
-    ARRAYOP(1)(_comm1_1_2(A1, B2) + _comm1_2_2(A2, B2) - _comm1_1_2(B1, A2))
+    ARRAYOP(1)(_comm1_1_1(A1, B1) + _comm1_1_2(A1, B2) + _comm1_2_2(A2, B2) #=
+            =# - _comm1_1_2(B1, A2))
 end
 function _comm1_pw(A, B)
     A0, A1, A2 = A
@@ -33,8 +34,8 @@ function _comm1_pw(A, B)
 
     for i in SPBASIS, j in SPBASIS
         ret[index(i), index(j)] =
-            _comm1_1_2_pw(A1, B2, i, j) + _comm1_2_2_pw(A2, B2, i, j) #=
-         =# - _comm1_1_2_pw(B1, A2, i, j)
+            _comm1_1_1_pw(A1, B1, i, j) + _comm1_1_2_pw(A1, B2, i, j) #=
+         =# + _comm1_2_2_pw(A2, B2, i, j) - _comm1_1_2_pw(B1, A2, i, j)
     end
 
     ARRAYOP(1)(ret)
@@ -73,6 +74,11 @@ _comm0_2_2(A, B) = 4 \ sum(matrixiter(A)) do X
     all(isocc, I)*all(isunocc, J)*(A[I, J]*B[J, I] - B[I, J]*A[J, I])
 end
 const _comm0_2_2_pw = _comm0_2_2
+
+_comm1_1_1(A, B) = A.rep*B.rep - B.rep*A.rep
+_comm1_1_1_pw(A, B, i, j) = sum(SPBASIS) do a
+    A[i, a]*B[a, j] - B[i, a]*A[a, j]
+end
 
 function _comm1_1_2(A, B)
     A′ = reshape(A.rep.*DMAT_HmH, DIM^2)
