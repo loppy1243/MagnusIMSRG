@@ -15,8 +15,9 @@ comm2(A::TwoBodyARRAYOP, B::TwoBodyARRAYOP) =
 comm2_pw(A::TwoBodyARRAYOP, B::TwoBodyARRAYOP) =
     (_comm0_pw(A, B), _comm1_pw(A, B), _comm2_pw(A, B))
 
-_comm0(A, B) = _comm0_2_2(nbody(A, 2), nbody(B, 2))
-_comm0_pw(A, B) = _comm0_2_2_pw(nbody(A, 2), nbody(B, 2))
+_comm0(A, B) = _comm0_1_1(nbody(A, 1), nbody(B, 1)) + _comm0_2_2(nbody(A, 2), nbody(B, 2))
+_comm0_pw(A, B) =
+    _comm0_1_1(nbody(A, 1), nbody(B, 1)) + _comm0_2_2_pw(nbody(A, 2), nbody(B, 2))
 
 function _comm1(A, B)
     A0, A1, A2 = A
@@ -58,6 +59,13 @@ function _comm2_pw(A, B)
 
     ARRAYOP(2)(ret)
 end
+
+_comm0_1_1(A, B) = sum(matrixiter(A)) do X
+    i, j = X
+
+    (isocc(i)-isunocc(j))*A[i, j]*B[j, i]
+end
+const _comm0_1_1_pw = _comm0_1_1
 
 _comm0_2_2(A, B) = 4 \ sum(matrixiter(A)) do X
     I, J = X
