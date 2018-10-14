@@ -108,8 +108,10 @@ function _comm2_1_2(A, B)
     B′ = reshape(B.rep, DIM, DIM^3) |> copy
     C′ = A.rep * B′
 
-    B′ = reshape(permutedims(B.rep, [1, 2, 4, 3]), DIM^3, DIM)
-    D′ = B′ * A.rep
+#    B′ .= reshape(permutedims(B.rep, [1, 2, 4, 3]), DIM^3, DIM)
+#    D′ = B′*A.rep
+    B′ .= reshape(PermutedDimsArray(B.rep, [3, 1, 2, 4]), DIM, DIM^3)
+    D′ = transpose(B′)*A.rep
 
     # Type unstable?
     C′ = reshape(C′, DIM, DIM, DIM, DIM)
@@ -159,7 +161,7 @@ function _comm2_2_2(A, B)
     for I in CartesianIndices(C′)
         i, j, k, l = Tuple(I)
 
-        C′[I] += 4 \ (D′[j, l, i, k] - D′[i, l, j, k] - D′[j, k, i, l] + D′[i, k, j, l])
+        C′[I] += 4 \ (D′[l, j, i, k] - D′[l, i, j, k] - D′[k, j, i, l] + D′[k, i, j, l])
     end
 
     C′
@@ -172,7 +174,8 @@ function _comm2_2_2_pw(A, B, i, j, k, l)
         tot += 2 \ (1-isocc(a)-isocc(b))*(A[i, j, a, b]*B[a, b, k, l] #=
                  =# - B[i, j, a, b]*A[a, b, k, l]) #=
             =# + (isocc(a)-isocc(b)) #=
-              =# * (prod3(i, j, k, l) - prod3(j, i, k, l) + prod3(j, i, l, k))
+            =# * (prod3(i, j, k, l) - prod3(j, i, k, l) - prod3(i, j, l, k) #=
+               =# + prod3(j, i, l, k))
     end
 
     tot / 4
