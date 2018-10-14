@@ -23,7 +23,8 @@ const Ω_BATCHSIZE = 5
 const H_RTOL = 0.0
 const H_ATOL = 0.01
 const INT_RTOL = 0.0
-const INT_ATOL = 0.001
+const INT_ATOL = 1e-3
+const INT_DIV_THRESH = 100.0
 const H_BATCHSIZE = 5
 const S_BIG_STEP = 1.0
 const S_SMALL_STEP = 1.0
@@ -85,23 +86,30 @@ function solve(h0; max_int_iters=MAX_INT_ITERS)
     h_prev = ZERO_OP
     h = h0
 
-    while @show(norm(h - h_prev)) > max(INT_ATOL, INT_RTOL*norm(h))
+    ss = [s]
+    es = mbdiag(h)
+    while (Nd = norm(h - h_prev)) > max(INT_ATOL, INT_RTOL*(N = norm(h)))
+        println("Norm diff.: ", Nd)
         @debug "Integration iter" n
         if n >= max_int_iters
             @warn "Iteration maximum exceeded in solve()" n s
             break
         end
+        if Nd > INT_DIV_THRESH
+            @warn "Divergence threshold exceeded in solve()" n s diffnorm=Nd
+            break
+        end
 
         h_prev = h
-        x = dΩ(Ω, h)
-#        @show norm(x)
-        Ω += #=dΩ(Ω, h0, h)=# x * S_SMALL_STEP
+        Ω += dΩ(Ω, h) * S_SMALL_STEP
         s += S_SMALL_STEP
         h = H(Ω, h0)
         n += 1
+        push!(ss, s)
+        es = hcat(es, mbdiag(h))
     end
 
-    h
+    h, ss, es
 end
 
 end # module MagnusIMSRG
