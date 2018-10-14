@@ -1,5 +1,5 @@
 function H(Ω, h0)
-    @info "Entering H"
+    @debug "Entering H"
     @debug "H term" n=0
     prev_tot = ZERO_OP
     prev_ad = h0
@@ -8,7 +8,7 @@ function H(Ω, h0)
     tot = 1/factorial(Float64, 0) * prev_ad
 
     n = 1
-    while @show(norm(tot - prev_tot)) > max(H_ATOL, H_RTOL*norm(tot))
+    while norm(tot - prev_tot) > max(H_ATOL, H_RTOL*norm(tot))
         @debug "H term" n
         prev_tot = tot
         tot += sum(n:n+H_BATCHSIZE-1) do i
@@ -16,7 +16,8 @@ function H(Ω, h0)
         end
         n += H_BATCHSIZE
     end
-tot
+
+    tot
 end
 
 function im_pairingH(g)

@@ -1,6 +1,6 @@
 module Generators
 using ManyBody
-using ..SIGNAL_OPS, ..TwoBodyARRAYOP, ..isocc, ..isunocc, ..FUNCOP, ..H
+using ..SIGNAL_OPS, ..E_DENOM_ATOL, ..TwoBodyARRAYOP, ..isocc, ..isunocc, ..FUNCOP, ..H
 
 SIGNAL_OPS && include("../signalops.jl")
 
@@ -16,24 +16,24 @@ function white(Ω::TwoBodyARRAYOP, h::TwoBodyARRAYOP)
 
     function _b1(I, J)
         d = Δ(I..., J...)
-        if iszero(d)
+        if abs(d) < E_DENOM_ATOL
             if EMIT_ZERO_WARNING_1
                 @warn("One-body energy denominator is zero! Will not warn again.")
                 EMIT_ZERO_WARNING_1 = false
             end
-            d
+            zero(d)
         else
             isunocc(I)*isocc(J)*f[I, J] / d
         end
     end
     function _b2(I, J)
         d = Δ(I..., J...)
-        if iszero(d)
+        if abs(d) < E_DENOM_ATOL
             if EMIT_ZERO_WARNING_2
                 @warn("Two-body energy denominator is zero! Will not warn again.")
                 EMIT_ZERO_WARNING_2 = false
             end
-            d
+            zero(d)
         else
             4 \ all(isunocc, I)*all(isocc, J)*Γ[I, J] / d
         end

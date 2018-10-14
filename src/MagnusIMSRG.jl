@@ -16,6 +16,7 @@ using JuliaUtil: bernoulli, @every
 const SIGNAL_OPS = false
 ##############################################################################################
 ### Parameters ###############################################################################
+const E_DENOM_ATOL = 0.001
 const Ω_RTOL = 0.0
 const Ω_ATOL = 0.01
 const Ω_BATCHSIZE = 5
@@ -25,7 +26,7 @@ const INT_RTOL = 0.0
 const INT_ATOL = 0.001
 const H_BATCHSIZE = 5
 const S_BIG_STEP = 1.0
-const S_SMALL_STEP = 0.01
+const S_SMALL_STEP = 1.0
 const MAX_INT_ITERS = 100
 ##############################################################################################
 
@@ -59,20 +60,17 @@ const generator = Generators.white
 factorial(T::Type{<:Number}, n::Integer) = prod(one(T):convert(T, n))
 
 function dΩ(Ω, h)
-    @info "Entering dΩ"
+    @debug "Entering dΩ"
     @debug "dΩ term" n=0
     prev_tot = ZERO_OP
     prev_ad = generator(Ω, h)
-    @show norm(prev_ad)
     tot = bernoulli(Float64, 0)/factorial(Float64, 0) * prev_ad
 
     n = 1
     while norm(tot - prev_tot) > max(Ω_ATOL, Ω_RTOL*norm(tot))
         prev_tot = tot
         tot += sum(n:n+Ω_BATCHSIZE-1) do i
-            ret = bernoulli(Float64, i)/factorial(Float64, i) * (prev_ad = comm(Ω, prev_ad))
-            @show norm(prev_ad)
-            ret
+            bernoulli(Float64, i)/factorial(Float64, i) * (prev_ad = comm(Ω, prev_ad))
         end
         n += Ω_BATCHSIZE
     end
@@ -87,7 +85,7 @@ function solve(h0; max_int_iters=MAX_INT_ITERS)
     h_prev = ZERO_OP
     h = h0
 
-    while norm(h - h_prev) > max(INT_ATOL, INT_RTOL*norm(h))
+    while @show(norm(h - h_prev)) > max(INT_ATOL, INT_RTOL*norm(h))
         @debug "Integration iter" n
         if n >= max_int_iters
             @warn "Iteration maximum exceeded in solve()" n s
