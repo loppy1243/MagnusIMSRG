@@ -58,17 +58,21 @@ const generator = Generators.white
 
 factorial(T::Type{<:Number}, n::Integer) = prod(one(T):convert(T, n))
 
-function dΩ(Ω, h0, h)
+function dΩ(Ω, h)
+    @info "Entering dΩ"
     @debug "dΩ term" n=0
     prev_tot = ZERO_OP
-    prev_ad = generator(Ω, h0, h)
+    prev_ad = generator(Ω, h)
+    @show norm(prev_ad)
     tot = bernoulli(Float64, 0)/factorial(Float64, 0) * prev_ad
 
     n = 1
     while norm(tot - prev_tot) > max(Ω_ATOL, Ω_RTOL*norm(tot))
         prev_tot = tot
         tot += sum(n:n+Ω_BATCHSIZE-1) do i
-            bernoulli(Float64, i)/factorial(Float64, i) * (prev_ad = comm(Ω, prev_ad))
+            ret = bernoulli(Float64, i)/factorial(Float64, i) * (prev_ad = comm(Ω, prev_ad))
+            @show norm(prev_ad)
+            ret
         end
         n += Ω_BATCHSIZE
     end
@@ -91,7 +95,9 @@ function solve(h0; max_int_iters=MAX_INT_ITERS)
         end
 
         h_prev = h
-        Ω += dΩ(Ω, h0, h) * S_SMALL_STEP
+        x = dΩ(Ω, h)
+#        @show norm(x)
+        Ω += #=dΩ(Ω, h0, h)=# x * S_SMALL_STEP
         s += S_SMALL_STEP
         h = H(Ω, h0)
         n += 1
