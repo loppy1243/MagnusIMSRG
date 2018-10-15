@@ -61,7 +61,7 @@ function mbdiag(op)
 end
 
 function randop(T=ELTYPE, B=SPBASIS)
-    arrop(N) = ArrayOperator{Bases.Product{N, NTuple{N, B}}, 2N}
+    arrop(N) = ArrayOperator{Bases.Product{N, NTuple{N, B}}, T, Array{T, 2N}}
 
     d = dim(B)
     E0 = rand(T)
@@ -69,4 +69,11 @@ function randop(T=ELTYPE, B=SPBASIS)
     Γ = rand(T, d, d, d, d)
 
     (E0, arrop(1)(f), arrop(2)(Γ))
+end
+
+function hermiticize(op::TwoBodyARRAYOP)
+    E0, f, Γ = op
+    Γc_rep = PermutedDimsArray(Γ.rep, [3, 4, 1, 2])
+
+    (E0, ARRAYOP(1)(2\(f.rep + f.rep')), ARRAYOP(2)(2\(Γ.rep + Γc_rep)))
 end
