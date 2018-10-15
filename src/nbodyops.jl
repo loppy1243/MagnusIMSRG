@@ -19,10 +19,10 @@ function norm(op)
     abs(E0) + LinearAlgebra.norm(f.rep) + LinearAlgebra.norm(Γ.rep)
 end
 
-function to_mbop(op)
+function to_mbop(op, T=ELTYPE, MB=MBBASIS)
     E0, f, Γ = op
 
-    MBFUNCOP() do X, Y
+    FunctionOperator{MB, T}() do X, Y
         b0 = E0*(X'Y)
         b1 = sum(matrixiter(f)) do ((p,), (q,))
             NA = normord(Operators.A(p', q))
@@ -38,21 +38,21 @@ function to_mbop(op)
     end
 end
 
-function mbdiag(op)
+function mbdiag(op, MB=MBBASIS)
     E0, f, Γ = op
 
-    ret = fill(E0, dim(MBBASIS))
+    ret = fill(E0, dim(MB))
 
     for ((p,), (q,)) in matrixiter(f)
         NA = normord(Operators.A(p', q))
-        for X in MBBASIS
+        for X in MB
             ret[index(X)] += f[p, q]*(X'NA(X))
         end
     end
     for (I, J) in matrixiter(Γ)
         p, q = I; r, s = J
         NA = normord(Operators.A(p', q', s, r))
-        for X in MBBASIS
+        for X in MB
             ret[index(X)] += Γ[I, J]*(X'NA(X))
         end
     end
