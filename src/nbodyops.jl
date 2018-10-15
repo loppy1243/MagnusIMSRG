@@ -59,3 +59,14 @@ function mbdiag(op)
 
     ret
 end
+
+function randop(T=ELTYPE, B=SPBASIS)
+    arrop(N) = ArrayOperator{Bases.Product{N, NTuple{N, B}}, 2N}
+
+    d = dim(B)
+    E0 = rand(T)
+    f = rand(T, d, d)
+    Γ = rand(T, d, d, d, d)
+
+    (E0, arrop(1)(f), arrop(2)(Γ))
+end
