@@ -1,4 +1,5 @@
 import LinearAlgebra
+using LinearAlgebra: I
 
 const TwoBodyARRAYOP = Tuple{ELTYPE, ARRAYOP(1), ARRAYOP(2)}
 
@@ -16,7 +17,7 @@ Base.:+(a::TwoBodyARRAYOP) = a
 Base.:-(a::TwoBodyARRAYOP, b::TwoBodyARRAYOP) = a .- b
 function norm(op)
     E0, f, Γ = op
-    abs(E0) + LinearAlgebra.norm(f.rep) + LinearAlgebra.norm(Γ.rep)
+    sqrt(abs(E0)^2 + LinearAlgebra.norm(f.rep)^2 + LinearAlgebra.norm(Γ.rep)^2)
 end
 
 function to_mbop(op, T=ELTYPE, MB=MBBASIS)
@@ -36,6 +37,24 @@ function to_mbop(op, T=ELTYPE, MB=MBBASIS)
 
         b0 + b1 + b2
     end
+end
+
+function to_mbop2(op, T=ELTYPE, MB=MBBASIS)
+    E0, f, Γ = op
+    d = dim(MB)
+
+    ret = E0*Array{T}(I, d, d)
+    for p in SPBASIS, q in SPBASIS, r in SPBASIS, s in SPBASIS
+        NA1 = normord(Operators.A(p', q))
+        NA2 = normord(Operators.A(p', q', s, r))
+        for X in MB, Y in MB
+            Y′ = deepcopy(Y)
+            ret[index(X), index(Y)] +=
+                d^2 \ f[p, q]*(X'applyop!(NA1, Y)) + Γ[p, q, r, s]*(X'applyop!(NA2, Y′))
+        end
+    end
+
+    MBARRAYOP(ret)
 end
 
 function mbdiag(op, MB=MBBASIS)
