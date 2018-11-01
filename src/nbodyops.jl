@@ -1,3 +1,5 @@
+export to_mbop
+
 import LinearAlgebra
 using LinearAlgebra: I
 
@@ -39,23 +41,24 @@ function to_mbop(op, T=ELTYPE, MB=MBBASIS)
     end
 end
 
-function to_mbop2(op, T=ELTYPE, MB=MBBASIS)
-    E0, f, Γ = op
-    d = dim(MB)
-
-    ret = E0*Array{T}(I, d, d)
-    for p in SPBASIS, q in SPBASIS, r in SPBASIS, s in SPBASIS
-        NA1 = normord(Operators.A(p', q))
-        NA2 = normord(Operators.A(p', q', s, r))
-        for X in MB, Y in MB
-            Y′ = deepcopy(Y)
-            ret[index(X), index(Y)] +=
-                d^2 \ f[p, q]*(X'applyop!(NA1, Y)) + Γ[p, q, r, s]*(X'applyop!(NA2, Y′))
-        end
-    end
-
-    MBARRAYOP(ret)
-end
+## This does not work
+#function to_mbop2(op, T=ELTYPE, MB=MBBASIS)
+#    E0, f, Γ = op
+#    d = dim(MB)
+#
+#    ret = E0*Array{T}(I, d, d)
+#    for p in SPBASIS, q in SPBASIS, r in SPBASIS, s in SPBASIS
+#        NA1 = normord(Operators.A(p', q))
+#        NA2 = normord(Operators.A(p', q', s, r))
+#        for X in MB, Y in MB
+#            Y′ = deepcopy(Y)
+#            ret[index(X), index(Y)] +=
+#                d^2 \ f[p, q]*(X'applyop!(NA1, Y)) + Γ[p, q, r, s]*(X'applyop!(NA2, Y′))
+#        end
+#    end
+#
+#    MBARRAYOP(ret)
+#end
 
 function mbdiag(op, MB=MBBASIS)
     E0, f, Γ = op
