@@ -16,7 +16,7 @@ using JuliaUtil: bernoulli, @every
 const SIGNAL_OPS = false
 ##############################################################################################
 ### Parameters ###############################################################################
-const E_DENOM_ATOL = 0.001
+const E_DENOM_ATOL = 1e-5
 const Ω_RTOL = 0.0
 const Ω_ATOL = 0.01
 const Ω_BATCHSIZE = 5
@@ -40,6 +40,7 @@ const ELTYPE = Float64
 const ARRAYOP(N) = F64ArrayOperator{Bases.Product{N, NTuple{N, SPBASIS}}, 2N}
 const FUNCOP(N) = F64FunctionOperator{Bases.Product{N, NTuple{N, SPBASIS}}}
 const MBFUNCOP = F64FunctionOperator{MBBASIS}
+const MBARRAYOP = F64ArrayOperator{MBBASIS, 2}
 
 const DIM = dim(SPBASIS)
 const LEVEL_SPACING = 1.0
@@ -79,17 +80,17 @@ function dΩ(Ω, h)
     tot
 end
 
-function solve(h0; max_int_iters=MAX_INT_ITERS)
+solve(h0; kws...) = solve((xs...,) -> nothing; kws...)
+function solve(cb, h0; max_int_iters=MAX_INT_ITERS)
     s = 0.0
     n = 0
     Ω = ZERO_OP
     h_prev = ZERO_OP
     h = h0
 
-    ss = [s]
-    es = mbdiag(h)
     while (Nd = norm(h - h_prev)) > max(INT_ATOL, INT_RTOL*(N = norm(h)))
-        println("Norm diff.: ", Nd)
+        println("Norm diff: ", Nd, "\tE0: ", h[1])
+        cb(s, Ω, h, Nd)
         @debug "Integration iter" n
         if n >= max_int_iters
             @warn "Iteration maximum exceeded in solve()" n s
@@ -105,11 +106,7 @@ function solve(h0; max_int_iters=MAX_INT_ITERS)
         s += S_SMALL_STEP
         h = H(Ω, h0)
         n += 1
-        push!(ss, s)
-        es = hcat(es, mbdiag(h))
     end
-
-    h, ss, es
 end
 
 end # module MagnusIMSRG
