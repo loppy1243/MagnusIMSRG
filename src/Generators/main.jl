@@ -1,6 +1,6 @@
 module Generators
 using ManyBody
-using ..SIGNAL_OPS, ..E_DENOM_ATOL, ..TwoBodyARRAYOP, ..isocc, ..isunocc, ..FUNCOP, ..H
+using ..MagnusIMSRG: SIGNAL_OPS, E_DENOM_ATOL, TwoBodyARRAYOP, isocc, isunocc, FUNCOP, H
 
 SIGNAL_OPS && include("../signalops.jl")
 
