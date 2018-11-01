@@ -1,4 +1,4 @@
-export to_mbop
+export to_mbop, nbody
 
 import LinearAlgebra
 using LinearAlgebra: I
