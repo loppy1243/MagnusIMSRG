@@ -1,3 +1,5 @@
+export im_pairingH
+
 function H(Ω, h0)
     @debug "Entering H"
     @debug "H term" n=0
