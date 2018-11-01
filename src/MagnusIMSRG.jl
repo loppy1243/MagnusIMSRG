@@ -81,7 +81,7 @@ function dΩ(Ω, h)
 end
 
 solve(h0; kws...) = solve((xs...,) -> nothing; kws...)
-function solve(cb, h0; max_int_iters=MAX_INT_ITERS)
+function solve(cb, h0; max_int_iters=MAX_INT_ITERS, ds=S_SMALL_STEP)
     s = 0.0
     n = 0
     Ω = ZERO_OP
@@ -89,7 +89,7 @@ function solve(cb, h0; max_int_iters=MAX_INT_ITERS)
     h = h0
 
     while (Nd = norm(h - h_prev)) > max(INT_ATOL, INT_RTOL*(N = norm(h)))
-        println("Norm diff: ", Nd, "\tE0: ", h[1])
+        println("Norm diff: ", Nd, "\tE0: ", nbody(h, 0))
         cb(s, Ω, h, Nd)
         @debug "Integration iter" n
         if n >= max_int_iters
@@ -102,8 +102,8 @@ function solve(cb, h0; max_int_iters=MAX_INT_ITERS)
         end
 
         h_prev = h
-        Ω += dΩ(Ω, h) * S_SMALL_STEP
-        s += S_SMALL_STEP
+        Ω += dΩ(Ω, h) * ds
+        s += ds
         h = H(Ω, h0)
         n += 1
     end
