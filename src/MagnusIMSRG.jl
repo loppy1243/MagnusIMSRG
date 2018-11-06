@@ -22,9 +22,9 @@ const Ω_ATOL = 0.01
 const Ω_BATCHSIZE = 5
 const H_RTOL = 0.0
 const H_ATOL = 0.01
-const INT_RTOL = 0.0
-const INT_ATOL = 1e-3
-const INT_DIV_THRESH = 100.0
+const INT_RTOL = 1e-8
+#const INT_ATOL = 1e-3
+const INT_DIV_RTHRESH = 1.0
 const H_BATCHSIZE = 5
 const S_BIG_STEP = 1.0
 const S_SMALL_STEP = 1.0
@@ -45,6 +45,8 @@ const DIM = dim(SPBASIS)
 const LEVEL_SPACING = 1.0
 const FERMILEVEL = fermilevel(REFSTATE)
 
+const HOLES = ManyBody.holes(REFSTATE, SPBASIS)
+const PARTS = ManyBody.parts(REFSTATE, SPBASIS)
 isocc(x) = ManyBody.isocc(REFSTATE, x)
 isunocc(x) = ManyBody.isocc(REFSTATE, x)
 normord(x) = ManyBody.normord(REFSTATE, x)
@@ -88,16 +90,16 @@ function solve(cb, h0; max_int_iters=MAX_INT_ITERS, ds=S_SMALL_STEP)
     h_prev = ZERO_OP
     h = h0
 
-    while (Nd = norm(h - h_prev)) > max(INT_ATOL, INT_RTOL*(N = norm(h)))
-        println("Norm diff: ", Nd, "\tE0: ", nbody(h, 0))
-        cb(s, Ω, h, Nd)
+    while (ratio = (dE0 = mbpt2(h))/nbody(h, 0)) > INT_RTOL
+        _print_info(nbody(h, 0), dE0)
+        cb(s, Ω, h, dE0)
         @debug "Integration iter" n
         if n >= max_int_iters
             @warn "Iteration maximum exceeded in solve()" n s
             break
         end
-        if Nd > INT_DIV_THRESH
-            @warn "Divergence threshold exceeded in solve()" n s diffnorm=Nd
+        if ratio > INT_DIV_RTHRESH
+            @warn "Divergence threshold exceeded in solve()" n s ratio
             break
         end
 
@@ -107,6 +109,15 @@ function solve(cb, h0; max_int_iters=MAX_INT_ITERS, ds=S_SMALL_STEP)
         h = H(Ω, h0)
         n += 1
     end
+end
+function _solve_print_info(E0, dE0_2)
+    nzdecdig(x) = ceil(Int, abs(log10(x-trunc(x))))
+
+    r = round(dE0/E0, digits=nzdecdig(INT_RTOL))
+    E0 = round(E0, digits=4)
+    dE0_2 = round(dE0, digits=nzdecdig(E0))
+
+    println("E0 = $E0,  dE0(2) = $dE0_2,  Ratio = $r")
 end
 
 end # module MagnusIMSRG
