@@ -32,7 +32,6 @@ const MAX_INT_ITERS = 100
 ##############################################################################################
 
 const SPBASIS = Bases.Pairing{4}
-const spbasis = basis(SPBASIS)
 const IXBASIS = indextype(SPBASIS)
 const REFSTATE = RefStates.Fermi(SPBASIS, 2)
 const MBBASIS = Bases.Paired{2, 4}
@@ -55,6 +54,7 @@ include("nbodyops.jl")
 include("comm2.jl")
 include("hamiltonians.jl")
 include("Generators/main.jl"); import .Generators
+include("mbpt.jl")
 
 const comm = comm2
 const generator = Generators.white
