@@ -45,8 +45,8 @@ const DIM = dim(SPBASIS)
 const LEVEL_SPACING = 1.0
 const FERMILEVEL = fermilevel(REFSTATE)
 
-const HOLES = ManyBody.holes(REFSTATE, SPBASIS)
-const PARTS = ManyBody.parts(REFSTATE, SPBASIS)
+const HOLES = ManyBody.holes(REFSTATE)
+const PARTS = ManyBody.parts(REFSTATE)
 isocc(x) = ManyBody.isocc(REFSTATE, x)
 isunocc(x) = ManyBody.isocc(REFSTATE, x)
 normord(x) = ManyBody.normord(REFSTATE, x)
