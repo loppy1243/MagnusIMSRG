@@ -91,7 +91,7 @@ function solve(cb, h0; max_int_iters=MAX_INT_ITERS, ds=S_SMALL_STEP)
     h = h0
 
     while (ratio = (dE0 = mbpt2(h))/nbody(h, 0)) > INT_RTOL
-        _print_info(nbody(h, 0), dE0)
+        _solve_print_info(nbody(h, 0), dE0)
         cb(s, Ω, h, dE0)
         @debug "Integration iter" n
         if n >= max_int_iters
