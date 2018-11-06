@@ -90,9 +90,9 @@ function solve(cb, h0; max_int_iters=MAX_INT_ITERS, ds=S_SMALL_STEP)
     h_prev = ZERO_OP
     h = h0
 
-    while (ratio = (dE0 = mbpt2(h))/nbody(h, 0)) > INT_RTOL
-        _solve_print_info(nbody(h, 0), dE0)
-        cb(s, Ω, h, dE0)
+    while (ratio = (dE0_2 = mbpt2(h))/nbody(h, 0)) > INT_RTOL
+        _solve_print_info(nbody(h, 0), dE0_2)
+        cb(s, Ω, h, dE0_2)
         @debug "Integration iter" n
         if n >= max_int_iters
             @warn "Iteration maximum exceeded in solve()" n s
@@ -113,9 +113,9 @@ end
 function _solve_print_info(E0, dE0_2)
     nzdecdig(x) = ceil(Int, abs(log10(x-trunc(x))))
 
-    r = round(dE0/E0, digits=nzdecdig(INT_RTOL))
+    r = round(dE0_2/E0, digits=nzdecdig(INT_RTOL))
     E0 = round(E0, digits=4)
-    dE0_2 = round(dE0, digits=nzdecdig(E0))
+    dE0_2 = round(dE0_2, digits=nzdecdig(E0))
 
     println("E0 = $E0,  dE0(2) = $dE0_2,  Ratio = $r")
 end
