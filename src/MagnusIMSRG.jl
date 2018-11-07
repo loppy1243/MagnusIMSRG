@@ -48,7 +48,7 @@ const FERMILEVEL = fermilevel(REFSTATE)
 const HOLES = ManyBody.holes(REFSTATE)
 const PARTS = ManyBody.parts(REFSTATE)
 isocc(x) = ManyBody.isocc(REFSTATE, x)
-isunocc(x) = ManyBody.isocc(REFSTATE, x)
+isunocc(x) = ManyBody.isunocc(REFSTATE, x)
 normord(x) = ManyBody.normord(REFSTATE, x)
 
 SIGNAL_OPS && include("signalops.jl")
@@ -82,18 +82,18 @@ function dΩ(Ω, h)
     tot
 end
 
-solve(h0; kws...) = solve((xs...,) -> nothing; kws...)
-function solve(cb, h0; max_int_iters=MAX_INT_ITERS, ds=S_SMALL_STEP)
+solve(h0; kws...) = solve((xs...,) -> nothing, h0; kws...)
+function solve(cb, h0; max_int_iters=MAX_INT_ITERS, ds=S_SMALL_STEP, print_info=true)
     s = 0.0
     n = 0
     Ω = ZERO_OP
     h_prev = ZERO_OP
     h = h0
 
-    while (ratio = (dE0_2 = mbpt2(h))/nbody(h, 0)) > INT_RTOL
-        _solve_print_info(nbody(h, 0), dE0_2)
-        cb(s, Ω, h, dE0_2)
-        @debug "Integration iter" n
+    while (ratio = abs((dE_2 = mbpt2(h))/nbody(h, 0))) > INT_RTOL
+        print_info && _solve_print_info(n, max_int_iters, nbody(h, 0), dE_2, ratio)
+        cb(s, Ω, h, dE_2)
+
         if n >= max_int_iters
             @warn "Iteration maximum exceeded in solve()" n s
             break
@@ -109,15 +109,30 @@ function solve(cb, h0; max_int_iters=MAX_INT_ITERS, ds=S_SMALL_STEP)
         h = H(Ω, h0)
         n += 1
     end
+
+    Ω
 end
-function _solve_print_info(E0, dE0_2)
-    nzdecdig(x) = ceil(Int, abs(log10(x-trunc(x))))
+function _solve_print_info(n, max_int_iters, E, dE_2, r)
+    sigdigs = 5
 
-    r = round(dE0_2/E0, digits=nzdecdig(INT_RTOL))
-    E0 = round(E0, digits=4)
-    dE0_2 = round(dE0_2, digits=nzdecdig(E0))
+    decdigs(x) = sigdigs - ndigits(trunc(Int, x))
+    nzdecdig(x) = ceil(Int, -log10(abs(x-trunc(x))))
 
-    println("E0 = $E0,  dE0(2) = $dE0_2,  Ratio = $r")
+    r_decdigs = nzdecdig(INT_RTOL)
+    E_decdigs = decdigs(E)
+
+    n = lpad(n, ndigits(max_int_iters))
+
+    r = round(r, digits=r_decdigs)
+    r = rpad(r, ndigits(trunc(Int, r))+1+r_decdigs, '0')
+
+    E = round(E, sigdigits=sigdigs)
+    E = rpad(E, (E<0)+sigdigs+1, '0')
+
+    dE_2 = round(dE_2, digits=E_decdigs)
+    dE_2 = rpad(dE_2, (dE_2<0)+ndigits(trunc(Int, dE_2))+1+E_decdigs, '0')
+
+    println("$n: E = $E,  dE(2) = $dE_2,  Ratio = $r")
 end
 
 end # module MagnusIMSRG

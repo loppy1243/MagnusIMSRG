@@ -23,7 +23,7 @@ function H(Ω, h0)
 end
 
 function im_pairingH(g)
-    E0 = sum(occ(REFSTATE)) do i
+    E = sum(occ(REFSTATE)) do i
         LEVEL_SPACING*(level(i) - 1)
     end - g/2*FERMILEVEL
 
@@ -38,5 +38,5 @@ function im_pairingH(g)
         -g/2*mask
     end
 
-    (E0, tabulate(f), tabulate(Γ))
+    (E, tabulate(f), tabulate(Γ))
 end
