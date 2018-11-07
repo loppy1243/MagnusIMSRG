@@ -3,8 +3,6 @@ module MagnusIMSRG
 using ManyBody
 import ManyBody.Operators
 import JuliaUtil
-#using OrdinaryDiffEq
-using Combinatorics: levicivita, combinations
 using JuliaUtil: bernoulli, @every
 
 #### Workaround b/c no internet :(
