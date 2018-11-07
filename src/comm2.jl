@@ -64,7 +64,7 @@ end
 _comm0_1_1(A, B) = sum(matrixiter(A)) do X
     i, j = X
 
-    (isocc(i)-isunocc(j))*A[i, j]*B[j, i]
+    (isocc(i)-isocc(j))*A[i, j]*B[j, i]
 end
 const _comm0_1_1_pw = _comm0_1_1
 
@@ -186,10 +186,10 @@ function _comm2_2_2_pw(A, B, i, j, k, l)
         prod3(i, j, k, l) = A[a, i, b, k]*B[b, j, a, l]
 
         tot += 2 \ (1-isocc(a)-isocc(b))*(A[i, j, a, b]*B[a, b, k, l] #=
-                 =# - B[i, j, a, b]*A[a, b, k, l]) #=
+                                      =# - B[i, j, a, b]*A[a, b, k, l]) #=
             =# + (isocc(a)-isocc(b)) #=
-            =# * (prod3(i, j, k, l) - prod3(j, i, k, l) - prod3(i, j, l, k) #=
-               =# + prod3(j, i, l, k))
+              =# * (prod3(i, j, k, l) - prod3(j, i, k, l) - prod3(i, j, l, k) #=
+                 =# + prod3(j, i, l, k))
     end
 
     tot / 4
