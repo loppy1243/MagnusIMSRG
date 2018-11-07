@@ -85,7 +85,9 @@ version = "0.19.0"
 
 [[JuliaUtil]]
 deps = ["SpecialFunctions"]
-path = "/home/loppy/julia/pkg/JuliaUtil"
+git-tree-sha1 = "cb4aa62de4056cc851412584f88930a56370bbe2"
+repo-rev = "master"
+repo-url = "https://github.com/loppy1243/JuliaUtil"
 uuid = "e0285c20-9bfe-11e8-0cca-5f36c2b0fa53"
 version = "0.1.0"
 
@@ -104,7 +106,9 @@ uuid = "56ddb016-857b-54e1-b83d-db4d58db5568"
 
 [[ManyBody]]
 deps = ["Combinatorics", "JuliaUtil", "LinearAlgebra", "Reexport", "Suppressor"]
-path = "../ManyBody"
+git-tree-sha1 = "94bab4cbaad9b931175618177ad8b8d6d55b9e49"
+repo-rev = "master"
+repo-url = "https://github.com/loppy1243/ManyBody"
 uuid = "59cbdfb0-9bfb-11e8-2ea2-0574352e373b"
 version = "0.1.0"
 
