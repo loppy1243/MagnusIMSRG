@@ -23,9 +23,9 @@ function H(Ω, h0)
 end
 
 function im_pairingH(g)
-    E0 = 2sum(occ(REFSTATE)) do i
+    E0 = sum(occ(REFSTATE)) do i
         LEVEL_SPACING*(level(i) - 1)
-    end - g/2*FERMILEVEL^2
+    end - g/2*FERMILEVEL
 
     f = FUNCOP(1)() do (p,), (q,)
         (p == q)*(LEVEL_SPACING*(level(p)-1) - g/2*FERMILEVEL)
@@ -39,25 +39,4 @@ function im_pairingH(g)
     end
 
     (E0, tabulate(f), tabulate(Γ))
-end
-
-function E∞(h)
-    E0, f, Γ = h
-
-    rstate = Bases.Slater(holes(SPBASIS))
-
-    E0 + rstate'f(rstate) + rstate'Γ(rstate)
-    
-    E_f = sum(matrixiter(f)) do ((p,), (q,))
-        NA = normord(Operators.A(p', q))
-        f[p, q]*(rstate'NA(rstate))
-    end
-
-    E_Γ = sum(matrixiter(Γ)) do (I, J)
-        p, q = I; r, s = J
-        NA = normord(Operators.A(p', q, s, r))
-        Γ[I, J]*(rstate'NA(rstate))
-    end
-
-    E0 + E_f + E_Γ
 end
