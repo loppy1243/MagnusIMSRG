@@ -65,7 +65,7 @@ function dΩ(Ω, h)
     @debug "Entering dΩ"
     @debug "dΩ term" n=0
     prev_tot = ZERO_OP
-    prev_ad = generator(Ω, h)
+    prev_ad = generator(h)
     tot = bernoulli(Float64, 0)/factorial(Float64, 0) * prev_ad
 
     n = 1
@@ -131,6 +131,33 @@ function _solve_print_info(n, max_int_iters, E, dE_2, r)
     dE_2 = rpad(dE_2, (dE_2<0)+ndigits(trunc(Int, dE_2))+1+E_decdigs, '0')
 
     println("$n: E = $E,  dE(2) = $dE_2,  Ratio = $r")
+end
+
+function solve_nomagnus(cb, h0; max_int_iters=MAX_INT_ITERS, ds=S_SMALL_STEP, print_info=true)
+    s = 0.0
+    n = 0
+    h = h0
+
+    while (ratio = abs((dE_2 = mbpt2(h))/nbody(h, 0))) > INT_RTOL
+        print_info && _solve_print_info(n, max_int_iters, nbody(h, 0), dE_2, ratio)
+        cb(s, h, dE_2)
+
+        if n >= max_int_iters
+            @warn "Iteration maximum exceeded in solve()" n s
+            break
+        end
+        if ratio > INT_DIV_RTHRESH
+            @warn "Divergence threshold exceeded in solve()" n s ratio
+            break
+        end
+
+        Ω += dΩ(Ω, h) * ds
+        h += ds*comm(generator(h), h)
+        s += ds
+        n += 1
+    end
+
+    Ω
 end
 
 end # module MagnusIMSRG

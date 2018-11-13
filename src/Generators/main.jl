@@ -1,12 +1,13 @@
 module Generators
 using ManyBody
-using ..MagnusIMSRG: SIGNAL_OPS, E_DENOM_ATOL, TwoBodyARRAYOP, isocc, isunocc, FUNCOP, H
+using ..MagnusIMSRG: SIGNAL_OPS, E_DENOM_ATOL, TwoBodyARRAYOP, isocc, isunocc, FUNCOP, H,
+                     ELTYPE, DIM, HOLES, PARTS, ARRAYOP
 
 SIGNAL_OPS && include("../signalops.jl")
 
 let EMIT_ZERO_WARNING_1=true, EMIT_ZERO_WARNING_2=true
 global white
-function white(Ω::TwoBodyARRAYOP, h::TwoBodyARRAYOP)
+function white(h::TwoBodyARRAYOP)
     E, f, Γ = h
 
     Δ(i, k) = f[i, i] - f[k, k] + Γ[i, k, i, k]
@@ -51,7 +52,7 @@ function white(Ω::TwoBodyARRAYOP, h::TwoBodyARRAYOP)
         Γ_ret[index(i), index(j), index(k), index(l)] = _b2(i, j, k, l) - conj(_b2(k, l, i, j))
     end
 
-    (zero(E), ARRAYOP(1)(b1), ARRAYOP(2)(b2))
+    (zero(E), ARRAYOP(1)(f_ret), ARRAYOP(2)(Γ_ret))
 end end
 
 end # module Generators
