@@ -14,47 +14,44 @@ function white(Ω::TwoBodyARRAYOP, h::TwoBodyARRAYOP)
         f[i, i] + f[j, j] - f[k, k] - f[l, l] + Γ[k, l, k, l] + Γ[i, j, i, j] #=
      =# - Γ[i, k, i, k] - Γ[j, l, j, l] - Γ[i, l, i, l] - Γ[j, k, j, k]
 
-    function _b1(I, J)
-        d = Δ(I..., J...)
-        mask = isunocc(I)*isocc(J)
-        if !iszero(mask) && abs(d) < E_DENOM_ATOL
+    function _b1(i, j)
+        d = Δ(i, j)
+        if abs(d) < E_DENOM_ATOL
             if EMIT_ZERO_WARNING_1
                 @warn("One-body energy denominator is zero! Will not warn again.")
                 EMIT_ZERO_WARNING_1 = false
             end
             zero(d)
-        elseif iszero(mask)
-            zero(d)
         else
-            mask*f[I, J] / d
+            f[i, j] / d
         end
     end
 
-    function _b2(I, J)
-        d = Δ(I..., J...)
-        mask = all(isunocc, I)*all(isocc, J)
-        if !iszero(mask) && abs(d) < E_DENOM_ATOL
+    function _b2(i, j, k, l)
+        d = Δ(i, j, k, l)
+        if abs(d) < E_DENOM_ATOL
             if EMIT_ZERO_WARNING_2
                 @warn("Two-body energy denominator is zero! Will not warn again.")
                 EMIT_ZERO_WARNING_2 = false
             end
             zero(d)
-        elseif iszero(mask)
-            zero(d)
         else
-            4 \ mask*Γ[I, J] / d
+            4 \ Γ[i, j, k, l] / d
         end
     end
 
-    b1 = FUNCOP(1)() do I, J
-#        i, j = inner(I), inner(J)
-        _b1(I, J) - conj(_b1(J, I))
-    end
-    b2 = FUNCOP(2)() do I, J
-        _b2(I, J) - conj(_b2(J, I))
+    f_ret = Array{ELTYPE}(undef, DIM, DIM)
+    Γ_ret = Array{ELTYPE}(undef, DIM, DIM, DIM, DIM)
+
+    for i in PARTS, j in HOLES
+        f_ret[index(i), index(j)] = _b1(i, j) - conj(_b1(j, i))
     end
 
-    (zero(E), tabulate(b1), tabulate(b2))
+    for i in PARTS, j in PARTS, k in HOLES, l in HOLES
+        Γ_ret[index(i), index(j), index(k), index(l)] = _b2(i, j, k, l) - conj(_b2(k, l, i, j))
+    end
+
+    (zero(E), ARRAYOP(1)(b1), ARRAYOP(2)(b2))
 end end
 
 end # module Generators
