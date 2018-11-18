@@ -45,9 +45,9 @@ version = "0.2.0"
 
 [[Compat]]
 deps = ["Base64", "Dates", "DelimitedFiles", "Distributed", "InteractiveUtils", "LibGit2", "Libdl", "LinearAlgebra", "Markdown", "Mmap", "Pkg", "Printf", "REPL", "Random", "Serialization", "SharedArrays", "Sockets", "SparseArrays", "Statistics", "Test", "UUIDs", "Unicode"]
-git-tree-sha1 = "2d9e14d19bad3f9ad5cc5e4cffabc3cfa59de825"
+git-tree-sha1 = "ec61a16eed883ad0cfa002d7489b3ce6d039bb9a"
 uuid = "34da2185-b29b-5c13-b0c7-acf172513d20"
-version = "1.3.0"
+version = "1.4.0"
 
 [[Contour]]
 deps = ["LinearAlgebra", "StaticArrays", "Test"]
@@ -135,9 +135,9 @@ version = "0.10.1"
 
 [[GR]]
 deps = ["Base64", "DelimitedFiles", "Pkg", "Random", "Serialization", "Sockets", "Test"]
-git-tree-sha1 = "18e3aa0f988f6e94c90394deaa76cb095bf87469"
+git-tree-sha1 = "d12425c0187189a6f2fabc5eea9f22f25d365049"
 uuid = "28b8d3ca-fb5f-59d9-8090-bfdbd6d07a71"
-version = "0.35.0"
+version = "0.36.0"
 
 [[GenericSVD]]
 deps = ["LinearAlgebra", "Random", "Test"]
@@ -195,9 +195,9 @@ uuid = "1914dd2f-81c6-5fcd-8719-6d5c9610ff09"
 version = "0.4.4"
 
 [[ManyBody]]
-deps = ["Combinatorics", "JuliaUtil", "LinearAlgebra", "Reexport", "Suppressor"]
-git-tree-sha1 = "94bab4cbaad9b931175618177ad8b8d6d55b9e49"
-repo-rev = "master"
+deps = ["Combinatorics", "Reexport"]
+git-tree-sha1 = "98f627ebd7bea11179d39213089e737cb34c49b3"
+repo-rev = "simplified"
 repo-url = "https://github.com/loppy1243/ManyBody"
 uuid = "59cbdfb0-9bfb-11e8-2ea2-0574352e373b"
 version = "0.1.0"
@@ -393,12 +393,6 @@ deps = ["BinaryProvider", "DataStructures", "DiffEqBase", "Libdl", "LinearAlgebr
 git-tree-sha1 = "01ecb3f3dc5c57f9cf0ae3ccf91ede899440d076"
 uuid = "c3572dad-4567-51f8-b174-8c6c989267f4"
 version = "2.6.0"
-
-[[Suppressor]]
-deps = ["Compat"]
-git-tree-sha1 = "a39342763981e766a72938b59032dc02a2d74da5"
-uuid = "fd094767-a336-5f1f-9728-57cf17d0bbfb"
-version = "0.1.1"
 
 [[TableTraits]]
 deps = ["IteratorInterfaceExtensions", "Test"]
