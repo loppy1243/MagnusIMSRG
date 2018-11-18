@@ -8,6 +8,10 @@ SIGNAL_OPS && include("../signalops.jl")
 let EMIT_ZERO_WARNING_1=true, EMIT_ZERO_WARNING_2=true
 global white
 function white(h::TwoBodyARRAYOP)
+    E, f, Γ = white((h[1], h[2].rep, h[3].rep))
+    (E, ARRAYOP(1)(f), ARRRAYOP(2)(Γ))
+end
+function white(h)
     E, f, Γ = h
 
     Δ(i, k) = f[i, i] - f[k, k] + Γ[i, k, i, k]
@@ -45,14 +49,16 @@ function white(h::TwoBodyARRAYOP)
     Γ_ret = Array{ELTYPE}(undef, DIM, DIM, DIM, DIM)
 
     for i in PARTS, j in HOLES
-        f_ret[index(i), index(j)] = _b1(i, j) - conj(_b1(j, i))
+        i, j = index.((i, j))
+        f_ret[i, j] = _b1(i, j) - conj(_b1(j, i))
     end
 
     for i in PARTS, j in PARTS, k in HOLES, l in HOLES
-        Γ_ret[index(i), index(j), index(k), index(l)] = _b2(i, j, k, l) - conj(_b2(k, l, i, j))
+        i, j, k, l = index.((i, j, k, l))
+        Γ_ret[i, j, k, l] = _b2(i, j, k, l) - conj(_b2(k, l, i, j))
     end
 
-    (zero(E), ARRAYOP(1)(f_ret), ARRAYOP(2)(Γ_ret))
+    (zero(E), f_ret, Γ_ret)
 end end
 
 end # module Generators

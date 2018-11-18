@@ -4,10 +4,9 @@ using ManyBody
 import ManyBody.Operators
 import JuliaUtil
 using JuliaUtil: bernoulli, @every
-
-#### Workaround b/c no internet :(
-#JuliaUtil.fbinom(a, b) =
-#    factorial(Float64, a) / (factorial(Float64, b)*factorial(Float64, a-b))
+using OrdinaryDiffEq
+#using RecursiveArrayTools: ArrayPartition
+#using Sundials: CVODE_BDF
 
 ##############################################################################################
 ### Flags ####################################################################################
@@ -24,8 +23,8 @@ const INT_RTOL = 1e-8
 #const INT_ATOL = 1e-3
 const INT_DIV_RTHRESH = 1.0
 const H_BATCHSIZE = 5
-const S_BIG_STEP = 1.0
-const S_SMALL_STEP = 1.0
+const S_LARGE_STEP = 1.0
+const S_SMALL_STEP = 0.1
 const MAX_INT_ITERS = 100
 ##############################################################################################
 
@@ -87,8 +86,9 @@ function solve(cb, h0; max_int_iters=MAX_INT_ITERS, ds=S_SMALL_STEP, print_info=
     Ω = ZERO_OP
     h_prev = ZERO_OP
     h = h0
+    dE_2 = mbpt2(h)
 
-    while (ratio = abs((dE_2 = mbpt2(h))/nbody(h, 0))) > INT_RTOL
+    while (ratio = abs(dE_2/nbody(h, 0))) > INT_RTOL
         if n >= max_int_iters
             @warn "Iteration maximum exceeded in solve()" n s
             break
@@ -104,6 +104,7 @@ function solve(cb, h0; max_int_iters=MAX_INT_ITERS, ds=S_SMALL_STEP, print_info=
         Ω += dΩ(Ω, h) * ds
         s += ds
         h = H(Ω, h0)
+        dE_2 = mbpt2(h)
         n += 1
     end
     print_info && _solve_print_info(n, max_int_iters, nbody(h, 0), dE_2, ratio)
@@ -112,13 +113,22 @@ function solve(cb, h0; max_int_iters=MAX_INT_ITERS, ds=S_SMALL_STEP, print_info=
     Ω
 end
 
-function solve_nomagnus(cb, h0; max_int_iters=MAX_INT_ITERS, ds=S_SMALL_STEP, print_info=true)
+const ALG = AutoTsit5(Rosenbrock23())
+function solve_nomagnus(cb, h0; max_int_iters=MAX_INT_ITERS, ds=S_SMALL_STEP, Ds=S_LARGE_STEP, print_info=true)
+    tovec(op) = vcat(op[1], op[2][:], op[3][:])
+    fromvec(v) = (v[1], reshape(v[2:1+DIM^2], DIM, DIM), reshape(v[2+DIM^2:1+DIM^2+DIM^4], DIM, DIM, DIM, DIM))
     s = 0.0
     n = 0
-    h = h0
+    h = tovec((h0[1], h0[2].rep, h0[3].rep))
+    dE_2 = mbpt2(h0)
 
-    dE_2 = mbpt2(h)
-    while (ratio = abs(dE_2/nbody(h, 0))) > INT_RTOL
+    function dh(h, _, s)
+        h = fromvec(h)
+        comm(generator(h), h) |> tovec
+    end
+    integrator = ODEProblem(dh, h, (s, s+Ds)) |> x -> init(x, ALG, dt=ds)
+    
+    while (ratio = abs(dE_2/h[1])) > INT_RTOL
         if n >= max_int_iters
             @warn "Iteration maximum exceeded in solve()" n s
             break
@@ -127,41 +137,46 @@ function solve_nomagnus(cb, h0; max_int_iters=MAX_INT_ITERS, ds=S_SMALL_STEP, pr
             @warn "Divergence threshold exceeded in solve()" n s ratio
             break
         end
-        print_info && _solve_print_info(n, max_int_iters, nbody(h, 0), dE_2, ratio)
+        print_info && _solve_print_info(n, max_int_iters, h[1], dE_2, ratio)
         cb(s, h, dE_2)
 
-        h += ds*comm(generator(h), h)
-        dE_2 = mbpt2(h)
-        s += ds
+        solve!(integrator)
+        s += Ds; add_tstop!(integrator, s+Ds)
+        h = integrator.sol[end]
+        dE_2 = mbpt2(fromvec(h))
         n += 1
     end
-    print_info && _solve_print_info(n, max_int_iters, nbody(h, 0), dE_2, ratio)
+    print_info && _solve_print_info(n, max_int_iters, h[1], dE_2, ratio)
     cb(s, h, dE_2)
 
-    h
+    fromvec(h)
 end
 
 function _solve_print_info(n, max_int_iters, E, dE_2, r)
-    sigdigs = 5
+    try
+        sigdigs = 5
 
-    decdigs(x) = sigdigs - ndigits(trunc(Int, x))
-    nzdecdig(x) = ceil(Int, -log10(abs(x-trunc(x))))
+        decdigs(x) = sigdigs - ndigits(trunc(Int, x))
+        nzdecdig(x) = ceil(Int, -log10(abs(x-trunc(x))))
 
-    r_decdigs = nzdecdig(INT_RTOL)
-    E_decdigs = decdigs(E)
+        r_decdigs = nzdecdig(INT_RTOL)
+        E_decdigs = decdigs(E)
 
-    n = lpad(n, ndigits(max_int_iters))
+        n = lpad(n, ndigits(max_int_iters))
 
-    r = round(r, digits=r_decdigs)
-    r = rpad(r, ndigits(trunc(Int, r))+1+r_decdigs, '0')
+        r = round(r, digits=r_decdigs)
+        r = rpad(r, ndigits(trunc(Int, r))+1+r_decdigs, '0')
 
-    E = round(E, sigdigits=sigdigs)
-    E = rpad(E, (E<0)+sigdigs+1, '0')
+        E = round(E, sigdigits=sigdigs)
+        E = rpad(E, (E<0)+sigdigs+1, '0')
 
-    dE_2 = round(dE_2, digits=E_decdigs)
-    dE_2 = rpad(dE_2, (dE_2<0)+ndigits(trunc(Int, dE_2))+1+E_decdigs, '0')
+        dE_2 = round(dE_2, digits=E_decdigs)
+        dE_2 = rpad(dE_2, (dE_2<0)+ndigits(trunc(Int, dE_2))+1+E_decdigs, '0')
 
-    println("$n: E = $E,  dE(2) = $dE_2,  Ratio = $r")
+        println("$n: E = $E,  dE(2) = $dE_2,  Ratio = $r")
+    catch
+        println("ERROR: Failed to print info.")
+    end
 end
 
 end # module MagnusIMSRG

@@ -60,27 +60,27 @@ function run_nomagnus()
     E_plt = hline([E∞], title="Zero-body Evolution", label="Exact", ylabel="Energy",
                   linestyle=:dash, color=:black, legend=true)
     plot!(E_plt, 2, label=["E" "+dE(2)"], color=[:green :red], markershape=[:circle :square])
-    eig_diff_plt = plot(D, label=round.(exact_eigs, digits=4), markershape=:circle,
-                        markersize=2, legend=:bottomleft, legendfontsize=5,
-                        xlabel="Flow Parameter", ylabel="Difference",
-                        title="Eigenvalue Evolution")
-    plt = plot(layout=(2, 1), E_plt, eig_diff_plt)
+#    eig_diff_plt = plot(D, label=round.(exact_eigs, digits=4), markershape=:circle,
+#                        markersize=2, legend=:bottomleft, legendfontsize=5,
+#                        xlabel="Flow Parameter", ylabel="Difference",
+#                        title="Eigenvalue Evolution")
+    plt = plot(#=layout=(2, 1),=# E_plt#=, eig_diff_plt=#)
 
-    MagnusIMSRG.solve_nomagnus(h0; max_int_iters=20, ds=0.5) do s, h, dE
+    MagnusIMSRG.solve_nomagnus(h0; max_int_iters=20, ds=1e-1, Ds=1.0) do s, h, dE
         E = nbody(h, 0)
-        new_eigs = tabulate(to_mbop(h)).rep |> eigvals |> sort
+#        new_eigs = tabulate(to_mbop(h)).rep |> eigvals |> sort
 
         push!(ss, s)
         push!(Es, E)
-        eigss = vcat(eigss, new_eigs)
+#        eigss = vcat(eigss, new_eigs)
         
         push!(E_plt, 2, s, E)
         push!(E_plt, 3, s, E+dE)
-        push!(eig_diff_plt, s, new_eigs.-exact_eigs)
+#        push!(eig_diff_plt, s, new_eigs.-exact_eigs)
         gui(plt)
     end
 
-    ss, Es, exact_eigs, eigss, plt
+    ss, Es, #=exact_eigs, eigss,=# plt
 end
     
 matgen() = MagnusIMSRG.im_pairingH(0.5) |> x -> MagnusIMSRG.to_mbop(x) |> tabulate

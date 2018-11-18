@@ -7,7 +7,10 @@ version = "0.1.0"
 JuliaUtil = "e0285c20-9bfe-11e8-0cca-5f36c2b0fa53"
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 ManyBody = "59cbdfb0-9bfb-11e8-2ea2-0574352e373b"
+OrdinaryDiffEq = "1dea7af3-3e70-54e6-95c3-0bf5283fa5ed"
 Plots = "91a5bcdd-55d7-5caf-9e0b-520d859cae80"
+RecursiveArrayTools = "731186ca-8d62-57ce-b412-fbd966d074cd"
+Sundials = "c3572dad-4567-51f8-b174-8c6c989267f4"
 
 [extras]
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
