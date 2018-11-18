@@ -5,7 +5,6 @@ import ManyBody.Operators
 import JuliaUtil
 using JuliaUtil: bernoulli, @every
 using OrdinaryDiffEq
-#using RecursiveArrayTools: ArrayPartition
 #using Sundials: CVODE_BDF
 
 ##############################################################################################
