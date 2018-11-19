@@ -3,49 +3,62 @@ module MagnusIMSRG
 using ManyBody
 import ManyBody.Operators
 import JuliaUtil
+using Parameters, OrdinaryDiffEq
 using JuliaUtil: bernoulli, @every
-using OrdinaryDiffEq
 #using Sundials: CVODE_BDF
 
-##############################################################################################
+
 ### Flags ####################################################################################
+##############################################################################################
 const SIGNAL_OPS = false
-##############################################################################################
+
 ### Parameters ###############################################################################
-const E_DENOM_ATOL = 1e-5
-const Ω_RTOL = 0.0
-const Ω_ATOL = 0.01
-const Ω_BATCHSIZE = 5
-const H_RTOL = 0.0
-const H_ATOL = 0.01
-const INT_RTOL = 1e-8
-#const INT_ATOL = 1e-3
-const INT_DIV_RTHRESH = 1.0
-const H_BATCHSIZE = 5
-const S_LARGE_STEP = 1.0
-const S_SMALL_STEP = 0.1
-const MAX_INT_ITERS = 100
 ##############################################################################################
+@with_kw struct HyParams
+    ENG_DENOM_ATOL  ::Float64                  = 1e-5
 
-const SPBASIS = Bases.Pairing{4}
-const IXBASIS = indextype(SPBASIS)
-const REFSTATE = RefStates.Fermi(SPBASIS, 2)
-const MBBASIS = Bases.Paired{2, 4}
-const ELTYPE = Float64
-const ARRAYOP(N) = F64ArrayOperator{Bases.Product{N, NTuple{N, SPBASIS}}, 2N}
-const FUNCOP(N) = F64FunctionOperator{Bases.Product{N, NTuple{N, SPBASIS}}}
-const MBFUNCOP = F64FunctionOperator{MBBASIS}
-const MBARRAYOP = F64ArrayOperator{MBBASIS, 2}
+    Ω_RTOL          ::Float64                  = 0.0
+    Ω_ATOL          ::Float64                  = 0.01
+    Ω_BATCHSIZE     ::Float64                  = 5
 
-const DIM = dim(SPBASIS)
-const LEVEL_SPACING = 1.0
-const FERMILEVEL = fermilevel(REFSTATE)
+    H_RTOL          ::Float64                  = 0.0
+    H_ATOL          ::Float64                  = 0.01
+    H_BATCHSIZE     ::Int                      = 5
 
-const HOLES = ManyBody.holes(REFSTATE)
-const PARTS = ManyBody.parts(REFSTATE)
-isocc(x) = ManyBody.isocc(REFSTATE, x)
-isunocc(x) = ManyBody.isunocc(REFSTATE, x)
-normord(x) = ManyBody.normord(REFSTATE, x)
+    INT_RTOL        ::Float64                  = 1e-8
+    INT_ATOL        ::Float64                  = 1e-3
+    INT_DIV_RTHRESH ::Float64                  = 1.0
+    MAX_INT_ITERS   ::Int                      = 100
+
+    ELTYPE          ::Type                     = Float64
+    MBBASIS         ::Type                     = Bases.Paired{4, 4}
+    REFSTATE        ::Union{RefState, MBBasis} = RefStates.Fermi{Bases.Pairing{4}}(2)
+    OPTYPE          ::Union{Type, Nothing}     = nothing
+end
+Base.getproperty(x::HyParams, s::Symbol) =
+    if s === :SPBASIS
+        spbasis(supbasis(getfield(x, :MBBASIS)))
+    elseif s === :DIM
+        dim(spbasis(supbasis(getfield(x, :MBBASIS))))
+    elseif s === :HOLES || s === :OCC
+        holes(getfield(x, :REFSTATE))
+    elseif s === :PARTS || s === :UNOCC
+        parts(getfield(x, :REFSTATE))
+    elseif s === :OPTYPE && getfield(x, s) === nothing
+        DenseIMArray{2, spbasis(supbasis(getfield(x, :MBBASIS)))}
+    else
+        getfield(x, s)
+    end
+
+@with_kw struct Params
+    S_LARGE_STEP         ::Float64  = 1.0
+    S_SMALL_STEP         ::Float64  = 0.1
+    H                    ::Function
+    H_PARAMS             ::NamedTuple
+    comm                 ::Function = comm2
+    gen                  ::Function = Generators.white
+    HYPARAMS             ::HyParams
+end
 
 SIGNAL_OPS && include("signalops.jl")
 include("nbodyops.jl")
@@ -54,16 +67,16 @@ include("hamiltonians.jl")
 include("Generators/main.jl"); import .Generators
 include("mbpt.jl")
 
-const comm = comm2
-const generator = Generators.white
 
 factorial(T::Type{<:Number}, n::Integer) = prod(one(T):convert(T, n))
 
-function dΩ(Ω, h)
+function dΩ(Ω, params, h)
     @debug "Entering dΩ"
+    @unpack gen, comm, Ω_ATOL, Ω_RTOL, Ω_BATCHSIZE = params
     @debug "dΩ term" n=0
-    prev_tot = ZERO_OP
-    prev_ad = generator(h)
+
+    prev_tot = zero(Ω)
+    prev_ad = gen(h)
     tot = bernoulli(Float64, 0)/factorial(Float64, 0) * prev_ad
 
     n = 1
@@ -78,13 +91,15 @@ function dΩ(Ω, h)
     tot
 end
 
-solve(h0; kws...) = solve((xs...,) -> nothing, h0; kws...)
-function solve(cb, h0; max_int_iters=MAX_INT_ITERS, ds=S_SMALL_STEP, print_info=true)
+solve(H, h_params; kws...) = solve((xs...,) -> nothing, H, h_params; kws...)
+function solve(cb, params)
+    @unpack H, H_PARAMS, OPTYPE, 
+
     s = 0.0
     n = 0
-    Ω = ZERO_OP
-    h_prev = ZERO_OP
-    h = h0
+    Ω = zero(OPTYPE)
+    h_prev = zero(OPTYPE)
+    h = 
     dE_2 = mbpt2(h)
 
     while (ratio = abs(dE_2/nbody(h, 0))) > INT_RTOL
