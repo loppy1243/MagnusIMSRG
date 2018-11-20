@@ -18,7 +18,7 @@ struct IMArrayOp{N, T, AS<:NTuple{N, AbstractArray{T}}}
     end
 end
 Base.getproperty(op::IMArrayOp, s::Symbol) =
-    if s === :bodies
+    if s === :parts
         Indexer(op)
     else
         Base.getfield(op, s)
@@ -96,10 +96,9 @@ end
 function Base.map!(f, dest::IMArrayOp{N}, srcs::IMArrayOp{N}...) where N
     @assert all(==(size(dest)), srcs)
 
-    @assert all(map(size, dest.bodies) .== map(size, src.bodies))
-    T = promote_type(eltype(dest), map(eltype, srcs)...)
-    for bs in zip(dest.bodies, map(op -> op.bodies, srcs)...)
-        bs[1] .= f.(bs[2:end]...)
+    @assert all(map(size, dest.parts) .== map(size, src.parts))
+    for bs in zip(dest.parts, map(op -> op.parts, srcs)...)
+        map!(f, bs[1], bs[2:end]...)
     end
 
     dest
@@ -136,17 +135,17 @@ function hconj(x::AbstractArray)
     d2 = div(d, 2)
     conj.(PermutedDimsArray(x, [d2+1:d... 1:d2...]))
 end
-hconj(x::IMArrayOp) = IMArrayOp(map(hconj, x.bodies)...)
+hconj(x::IMArrayOp) = IMArrayOp(map(hconj, x.parts)...)
 Base.ctranspose(op::IMArrayOp) = hconj(op)
 
-norm(op::IMArrayOp) = sqrt(sum(x -> sum(x.^2), op.bodies))
+norm(op::IMArrayOp) = sqrt(sum(x -> sum(x.^2), op.parts))
 
 ### Update Line ##############################################################################
 
 to_mbop(op, B) = to_mbop(op, B, B)
-function to_mbop(op::IMArrayOp, B1, B2)
+function to_mbop(op::IMArrayOp{2}, B1, B2)
     T = eltype(op)
-    E, f, Γ = op.bodies
+    E, f, Γ = op.parts
 
     tabulate(eltype(op), B1, B2) do X, Y
         X = supelem(X); Y = supelem(Y)
