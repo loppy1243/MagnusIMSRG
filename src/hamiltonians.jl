@@ -24,23 +24,23 @@ function H(Ω, h0)
     tot
 end
 
-function im_pairing(g)
-    E = sum(occ(REFSTATE)) do i
-        LEVEL_SPACING*(level(i) - 1)
-    end - g/2*FERMILEVEL
+function impairing2(ref, δ, g)
+    self_int = g/4*nocc(ref)
 
-    f = FUNCOP(1)() do (p,), (q,)
-        (p == q)*(LEVEL_SPACING*(level(p)-1) - g/2*FERMILEVEL)
-    end
+    E = sum(occ(ref)) do i
+        δ*(i.level - 1)
+    end - self_int
 
-    Γ = FUNCOP(2)() do (p, q), (r, s)
-        mask = (level(p) == level(q))*(level(r) == level(s)) #=
+    f = (p, q) -> (p == q)*(δ*(p.level-1) - self_int)
+
+    Γ = function(p, q, r, s)
+        mask = (p.level == q.level)*(r.level == s.level) #=
             =# * spinup(p)*spinup(r)*spindown(q)*spindown(s)
 
         -g/2*mask
     end
 
-    (E, tabulate(f), tabulate(Γ))
+    (E, f, Γ)
 end
 
 end # module Hamiltonians
