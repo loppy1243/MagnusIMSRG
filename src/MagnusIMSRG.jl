@@ -108,7 +108,8 @@ end
 solve(H, h_params; kws...) = solve((xs...,) -> nothing, H, h_params; kws...)
 function solve(cb, H, H_PARAMS; kws...)
     params = Params(; H=H, H_PARAMS=H_PARAMS, kws...)
-    @unpack TRUNC_LEVEL, ELTYPE, INT_ATOL, INT_RTOL, MAX_INT_ITERS, INT_DIV_ATOL, INT_DIV_RTOL = params
+    @unpack TRUNC_LEVEL, ELTYPE, INT_ATOL, INT_RTOL, MAX_INT_ITERS, INT_DIV_ATOL, INT_DIV_RTOL #=
+         =# = params
     ZERO_OP = zero(DenseIMArrayOp{TRUNC_LEVEL, ELTYPE})
 
     s = 0.0

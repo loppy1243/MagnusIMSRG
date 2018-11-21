@@ -1,5 +1,7 @@
 export im_pairingH
 
+module Hamiltonians
+
 function H(Ω, h0)
     @debug "Entering H"
     @debug "H term" n=0
@@ -22,7 +24,7 @@ function H(Ω, h0)
     tot
 end
 
-function im_pairingH(g)
+function im_pairing(g)
     E = sum(occ(REFSTATE)) do i
         LEVEL_SPACING*(level(i) - 1)
     end - g/2*FERMILEVEL
@@ -40,3 +42,5 @@ function im_pairingH(g)
 
     (E, tabulate(f), tabulate(Γ))
 end
+
+end # module Hamiltonians
