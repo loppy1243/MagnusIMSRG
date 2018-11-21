@@ -10,7 +10,8 @@ struct IMArrayOp{N, T, AS<:NTuple{N, AbstractArray{T}}}
     b0::Array{T, 0}
     bs::AS
 
-    function IMArrayOp{N, T, AS}(b0::_X{T}, bs::AS) where {N, T, AS<:NTuple{N, AbstractArray{T}}}
+    function IMArrayOp{N, T, AS}(b0::_X{T}, bs::AS) where
+                      {N, T, AS<:NTuple{N, AbstractArray{T}}}
         for (i, b) in enumerate(bs)
             @assert ndims(b) == 2i
         end
@@ -129,16 +130,43 @@ end
 Hermitian conjugate of x.
 """
 hconj(x::Number) = conj(x)
+function hconj(x::AbstractArray{<:Any, 0})
+    ret = similar(x)
+    ret[] = hconj(x[])
+    ret
+end
 # Note that we must have `ndims(x) % 2 == 0`
 function hconj(x::AbstractArray)
     d = ndims(a)
     d2 = div(d, 2)
     conj.(PermutedDimsArray(x, [d2+1:d... 1:d2...]))
 end
-hconj(x::IMArrayOp) = IMArrayOp(map(hconj, x.parts)...)
+hconj(x::IMArrayOp) = typeof(x)(map(hconj, x.parts)...)
 Base.ctranspose(op::IMArrayOp) = hconj(op)
 
 norm(op::IMArrayOp) = sqrt(sum(x -> sum(x.^2), op.parts))
+
+@generated function ManyBody.tabulate(fs, ::Type{O}, B) where O<:IMArrayOp
+    N = imrank(O)
+
+    arg_nums = [2n for n=1:N]
+
+    syms = [Symbol("p$i") for i = 1:N]
+    atypes = arraytypes(O)
+    decls = map(syms, atypes) do p, A
+        :($p = zero($A))
+    end
+    loops = map(1:N, syms) do i, p
+        :(@ncall(broadcast!, $p, fs[$(i+1)], _ -> linearindexer(B)))
+    end
+
+    quote
+        p0 = fs[1]
+        $(decls...)
+        $(loops...)
+        (p0, $(syms...))
+    end
+end
 
 ### Update Line ##############################################################################
 
