@@ -1,3 +1,2 @@
-x Factor out density matrices.
 - Write benchmarks for `comm2()` and `comm2_pw()`.
-x Extract desired eigenvalues and plot.
+- Rewrite `comm2()` to use the same pre-allocated storage throughout.
