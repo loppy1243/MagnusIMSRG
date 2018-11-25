@@ -1,9 +1,9 @@
-mbpt2(op::TwoBodyARRAYOP) = mbpt2((op[1], op[2].rep, op[3].rep))
-function mbpt2(op)
-    _, f, Γ = op
+function mbpt2(op::IMArrayOp{2}, params)
+    @unpack HOLES, PARTS = params
+    E, f, Γ = op.parts
 
-    sum(Iterators.product(HOLES, HOLES, PARTS, PARTS)) do X
-        i, j, a, b = index.(X)
-        4 \ Γ[a, b, i, j]^2 / (f[i, i] + f[j, j] - f[a, a] - f[b, b])
+    ret = zero(E)
+    for i in HOLES, j in HOLES, a in PARTS, b in PARTS
+        ret += 4 \ Γ[a, b, i, j]^2 / (f[i, i] + f[j, j] - f[a, a] - f[b, b])
     end
 end

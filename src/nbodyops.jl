@@ -1,5 +1,5 @@
 module IMOperators
-#export to_mbop, nbody
+export IMArrayOp, DenseIMArrayOP, imrank, hconj, mbop
 
 #import LinearAlgebra
 #using LinearAlgebra: I
@@ -56,6 +56,7 @@ imrank(A::Type{<:AbstractArray}) = div(ndims(a), 2)
 imrank(a::AbstractArray) = imrank(typeof(a))
 Base.eltype(::Type{<:IMArrayOp{<:Any, T}}) where T = T
 
+# Make into method on Base.size?
 size(op::IMArrayOp) = map(size, op.bs)
 
 ### Indexing
@@ -146,55 +147,51 @@ Base.ctranspose(op::IMArrayOp) = hconj(op)
 
 norm(op::IMArrayOp) = sqrt(sum(x -> sum(x.^2), op.parts))
 
-@generated function ManyBody.tabulate(fs, ::Type{O}, B) where O<:IMArrayOp
-    N = imrank(O)
+Base.similar(O::Type{<:IMArrayOp}, dims...) = similar(O, eltype(O), dims...)
+Base.similar(O::Type{<:IMArrayOp{N}}, T::Type, dims::Vararg{<:Any, N}) where N =
+    similar(O, T, dims)
+Base.similar(O::Type{<:IMArrayOp{N}}, T::Type, dims::NTuple{N}) where N =
+    O(fill(T), map(similar, arraytypes(O), dims))
+Base.similar(op::IMArrayOp) = typeof(op)(undef)
+Base.similar(op::IMArrayOp, T::Type) = IMArrayOp(map(x -> similar(x, T), op.parts)...)
+Base.similar(op::IMArrayOp, dims...) = similar(typeof(op), dims...)
+Base.similar(op::IMArrayOp, T::Type, dims...) = similar(typeof(op), T, dims...)
 
-    arg_nums = [2n for n=1:N]
-
-    syms = [Symbol("p$i") for i = 1:N]
-    atypes = arraytypes(O)
-    decls = map(syms, atypes) do p, A
-        :($p = zero($A))
-    end
-    loops = map(1:N, syms) do i, p
-        :(@ncall(broadcast!, $p, fs[$(i+1)], _ -> linearindexer(B)))
-    end
-
-    quote
-        p0 = fs[1]
-        $(decls...)
-        $(loops...)
-        (p0, $(syms...))
-    end
+ManyBody.tabulate(fs, O::Type{<:IMArrayOp}, B::AbstractBasis) =
+    tabulate(fs, O, Tuple(B for _=1:imrank(O)))
+ManyBody.tabulate(fs, O::Type{<:IMArrayOp}, Bs::Tuple) =
+    O(fill(fs[1]), map(tabulate, fs[2:end], arraytypes(O), Bs) |> Tuple)
+function ManyBody.tabulate!(fs, op::IMArrayOp, Bs::Tuple)
+    op.parts[0][] = fs[1]
+    foreach(tabulate!, fs[2:end], op.parts[1:end], Bs)
+    op
 end
 
 ### Update Line ##############################################################################
 
-to_mbop(op, B) = to_mbop(op, B, B)
-function to_mbop(op::IMArrayOp{2}, B1, B2)
+mbop(op, B) = mbop(op, B, B)
+function mbop(op::IMArrayOp{2}, B1, B2)
     T = eltype(op)
     E, f, Γ = op.parts
 
-    tabulate(eltype(op), B1, B2) do X, Y
-        X = supelem(X); Y = supelem(Y)
+    tabulate(typeof(op.parts[1]), B1, B2) do X, Y
         SPB = spbasis(Y)
-        LI = LinearIndices(SPB)
 
         ret = E*overlap(X, Y)
         for p in SPB, q in SPB
             NA = normord(Operators.@A(p', q))
-            ret += f[LI[p], LI[q]] * NA(X, Y)
+            ret += f[p, q] * NA(X, Y)
         end
        
         for p in SPB, q in SPB, r in SPB, s in SPB
             NA = normord(Operators.@A(p', q', s, r))
-            ret += Γ[LI[p], LI[q], LI[r], LI[s]] * NA(X, Y)
+            ret += Γ[p, q, r, s] * NA(X, Y)
         end
 
         b0 + b1 + b2
     end
 end
 
-randimop(T, dims...) = IMArrayOp(rand(T), map(ds -> rand(T, ds))...)
+randimop(T, dims...) = IMArrayOp(rand(T), map(ds -> rand(T, ds), dims)...)
 
 end # module IMOperators

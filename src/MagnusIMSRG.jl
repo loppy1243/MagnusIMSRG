@@ -116,7 +116,7 @@ function solve(cb, H, H_PARAMS; kws...)
     n = 0
     Ω = ZERO_OP
     h_prev = ZERO_OP
-    h = H(H_PARAMS...)
+    h = tabulate(H(H_PARAMS...), DenseIMArrayOp{2}, SPBASIS)
     dE_2 = mbpt2(h)
 
     while abs(dE_2) > choosetol(INT_ATOL, INT_RTOL*abs(h.parts[0]))
