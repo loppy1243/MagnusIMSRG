@@ -79,7 +79,7 @@ end
 Base.firstindex(I::Indexer) = 0
 Base.lastindex(I::Indexer) = imrank(_imoptype(I))
 
-### Iteration
+### Iteration ################################################################################
 ##############################################################################################
 Base.IteratorEltype(::Type{<:Indexer}) = Base.EltypeUnknown()
 Base.IteratorSize(::Type{<:Indexer}) = Base.HasLength()
@@ -102,9 +102,49 @@ function Base.iterate(op::IMArrayOp, (part, inner)=(0, (op.parts[0],)))
     (X[1], (part, (op.parts[part], X[2])))
 end
 
-### Operations
+### Vectorization ############################################################################
 ##############################################################################################
+struct VectorView{T, O<:IMArrayOp{<:Any, T}} <: AbstractVector{T}
+    op::O
+end
+_imoptype(::Type{<:VectorView{<:Any, O}}) where O<:IMArrayOp = O
+_imoptype(v::VectorView) = _imoptype(typeof(v))
 
+Base.vec(op::IMArrayOp) = VectorView(op)
+IMArrayOp(v::VectorView) = v.op
+
+## AbstractArray interface
+Base.size(v::VectorView) = (sum(length, v.op.parts),)
+function Base.getindex(v::VectorView, i::Int)
+    j = i
+    for part in v.op.parts
+        l = length(part)
+        if j <= l
+            return part[j]
+        else
+            j -= l
+        end
+    end
+
+    throw(BoundsError(v, i))
+end
+function Base.setindex!(v::VectorView, val, i::Int)
+    j = i
+    for part in v.op.parts
+        l = length(part)
+        if j <= l
+            return (part[j] = val)
+        else
+            j -= l
+        end
+    end
+
+    throw(BoundsError(v, i))
+end
+Base.IndexStyle(::Type{<:VectorView}) = IndexLinear()
+
+### Operations ###############################################################################
+##############################################################################################
 function Base.map(f, ops::IMArrayOp{N}...) where N
     sz = IMOperators.size(ops[1])
     @assert all(ops) do op
