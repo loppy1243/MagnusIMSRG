@@ -2,6 +2,7 @@ module Commutators
 using ManyBody, ..IMOperators
 using Base.Cartesian
 
+using LinearAlgebra: tr
 using Parameters: @unpack
 import ..SIGNAL_OPS, ..@getparams
 
@@ -53,7 +54,7 @@ function comm2(A::IMArrayOp{2}, B::IMArrayOp{2})
 
     IMArrayOp(C0, reshape(C1, orig_size1), reshape(C2, orig_size2))
 end
-comm2_pw(DIM) = function(A::IMArrayOp{2}, B::IMArrayOp{2})
+function comm2_pw(A::IMArrayOp{2}, B::IMArrayOp{2})
     A0, A1, A2 = A.parts; B0, B1, B2 = B.parts
     args = (A1, A2, B1, B2)
 
@@ -61,19 +62,19 @@ comm2_pw(DIM) = function(A::IMArrayOp{2}, B::IMArrayOp{2})
 end
 
 _comm0(A1, A2, B1, B2) = _comm0_1_1(A1, B1) + _comm0_2_2(A2, B2)
-_comm0_pw(A1, A2, B1, B2) = _comm0_1_1(A1, B1) + _comm0_2_2_pw(A2, B2)
+_comm0_pw(A1, A2, B1, B2) = _comm0_1_1_pw(A1, B1) + _comm0_2_2_pw(A2, B2)
 
 _comm1(A1, A2, B1, B2) =
     _comm1_1_1(A1, B1) + _comm1_1_2(A1, B2) + _comm1_2_2(A2, B2) - _comm1_1_2(B1, A2)
-_comm1_pw(A1, A2, B1, B2) = tabulate(Array{ELTYPE}, 2, SPBASIS) do I
-    _comm1_1_1_pw(A1, B1, I...) + _comm1_1_2_pw(A1, B2, I...) #=
-    =#+ _comm1_2_2_pw(A2, B2, I...) - _comm1_1_2_pw(B1, A2, I...)
+_comm1_pw(A1, A2, B1, B2) = tabulate(Array{ELTYPE}, 2, SPBASIS) do i, j
+    _comm1_1_1_pw(A1, B1, i, j) + _comm1_1_2_pw(A1, B2, i, j) #=
+    =#+ _comm1_2_2_pw(A2, B2, i, j) - _comm1_1_2_pw(B1, A2, i, j)
 end
 
 _comm2(A1, A2, B1, B2) = _comm2_1_2(A1, B2) + _comm2_2_2(A2, B2) - _comm2_1_2(B1, A2)
-_comm2_pw(A1, A2, B1, B2) = tabulate(Array{ELTYPE}, 4, SPBASIS) do I
-    _comm2_1_2_pw(A1, B2, I...) + _comm2_2_2_pw(A2, B2, I...) #=
-    =#- _comm2_1_2_pw(B1, A2, I...)
+_comm2_pw(A1, A2, B1, B2) = tabulate(Array{ELTYPE}, 4, SPBASIS) do i, j, k, l
+    _comm2_1_2_pw(A1, B2, i, j, k, l) + _comm2_2_2_pw(A2, B2, i, j, k, l) #=
+    =#- _comm2_1_2_pw(B1, A2, i, j, k, l)
 end
 
 function _comm0_1_1(A, B)
@@ -82,51 +83,49 @@ function _comm0_1_1(A, B)
     α = matrix(A.*OMAT_HmH)
     B′ = matrix(B)
 
-    tr(OMAT_HmH*α*B′)
+    tr(α*B′)
 end
-
 _comm0_1_1_pw(A, B) = cartesian_sum(2, SPBASIS) do i, j
     (isocc(i)-isocc(j))*A[i, j]*B[j, i]
 end
 
 function _comm0_2_2(A, B)
-    matrix(x) = reshape(a, DIM^2, DIM^2)
+    matrix(x) = reshape(x, DIM^2, DIM^2)
 
     α = matrix(A.*OMAT_HHPP)
     B′ = matrix(B)
-    C = α*B′
+    C = α*B′ / 4
 
     A′ = matrix(A)
     β = matrix(B.*OMAT_HHPP)
-    C .-= β*A′
+    C .-= β*A′ ./ 4
 
-    C′ = matrix(C)
-
-    tr(C′)
+    tr(C)
 end
-_comm0_2_2_pw(SPBASIS, A, B) = 4 \ cartesian_sum(4, SPBASIS) do i, j, k, l
-    all(isocc, (i, j))*all(isunocc, (k, l)) #=
+_comm0_2_2_pw(A, B) = 4 \ cartesian_sum(4, SPBASIS) do i, j, k, l
+    isocc(i)*isocc(j)*isunocc(k)*isunocc(l) #=
     =#* (A[i, j, k, l]*B[k, l, i, j] - B[i, j, k, l]*A[k, l, i, j])
 end
 
 _comm1_1_1(A, B) = A*B - B*A
-_comm1_1_1_pw(SPBASIS, A, B, i, j) = sum(SPBASIS) do a
+_comm1_1_1_pw(A, B, i, j) = sum(SPBASIS) do a
     A[i, a]*B[a, j] - B[i, a]*A[a, j]
 end
 
 function _comm1_1_2(A, B)
     vector(x) = reshape(x, DIM^2)
-    matrix(x) = reshape(x, DIM^2, DIM^2)
+    matrix22(x) = reshape(x, DIM^2, DIM^2)
+    matrix11(x) = reshape(x, DIM, DIM)
 
     α = vector(A.*OMAT_HmH)
 
     # [b, i, a, j] -> [i, j, a, b]
-    B′ = matrix(PermutedDimsArray(B, [2, 4, 3, 1]))
+    B′ = matrix22(PermutedDimsArray(B, [2, 4, 3, 1]))
     # [i, j, a, b]*[a, b] = [i, j]
-    B′*α
+    matrix11(B′*α)
 end
-_comm1_1_2_pw(SPBASIS, A, B, i, j) = cartesian_sum(2, SPBASIS) do a, b
-    (isocc(A)-isocc(b))*A[a, b]*B[b, i, a, j]
+_comm1_1_2_pw(A, B, i, j) = cartesian_sum(2, SPBASIS) do a, b
+    (isocc(a)-isocc(b))*A[a, b]*B[b, i, a, j]
 end
 
 function _comm1_2_2(A, B)
@@ -148,6 +147,10 @@ function _comm1_2_2(A, B)
 
     C ./= 2
 end
+_comm1_2_2_pw(A, B, i, j) = 2 \ cartesian_sum(3, SPBASIS) do a, b, c
+    (isunocc(a)*isunocc(b)*isocc(c) + isocc(a)*isocc(b)*isunocc(c)) #=
+    =# * (A[c, i, a, b]*B[a, b, c, j] - B[c, i, a, b]*A[a, b, c, j])
+end
 #function _comm1_2_2(A, B)
 #    matrix(x) = reshape(x, DIM^2, DIM^2)
 #
@@ -160,36 +163,34 @@ end
 #
 #    sum(C, dims=1)
 #end
-_comm1_2_2_pw(SPBASIS, A, B, i, j) = 2 \ cartesian_sum(3, SPBASIS) do a, b, c
-    (isunocc(a)*isunicc(b)*isocc(c) + isocc(a)*isocc(b)*isocc(c)) #=
-    =# * (A[c, i, a, b]*B[a, b, c, j] - B[c, i, a, b]*A[a, b, c, j])
-end
 
 function _comm2_1_2(A, B)
-    matrix(x) = rehshape(x, DIM, DIM^3)
+    matrix13(x) = reshape(x, DIM, DIM^3)
+    matrix31(x) = reshape(x, DIM^3, DIM)
     tensor(x) = reshape(x, DIM, DIM, DIM, DIM)
 
-    B′ = matrix(B)
+    B′ = matrix13(B)
     # [i, a]*[a, j, k, l] = [i, j, k, l]
     C = A*B′
 
     # [i, j, a, l] -> [i, j, l, a]
-    B′ = matrix(PermutedDimsArray(B, [1, 2, 4, 3]))
+    B′ = matrix31(PermutedDimsArray(B, [1, 2, 4, 3]))
     # [i, j, l, a]*[a, k] = [i, j, l, k]
     D = B′*A
 
     C′ = tensor(C); D′ = tensor(D)
-    ret = Array{ELTYPE}(undef, DIM, DIM, DIM, DIM)
+    ret = similar(C′)
     for I in CartesianIndices(ret)
         i, j, k, l = Tuple(I)
 
+        #                P()              P(i,j)           P()              P(k,l)
         ret[I] = 4 \ (C′[i, j, k, l] - C′[j, i, k, l] - D′[i, j, l, k] + D′[i, j, k, l])
     end
 
     ret
 
 end
-_comm2_1_2_pw(SPBASIS, A, B, i, j, k, l) = 4 \ sum(SPBASIS) do a
+_comm2_1_2_pw(A, B, i, j, k, l) = 4 \ sum(SPBASIS) do a
     prod1(i, j, k, l) = A[i, a]*B[a, j, k, l]
     prod2(i, j, k, l) = A[a, k]*B[i, j, a, l]
 
@@ -204,7 +205,7 @@ function _comm2_2_2(A, B)
     β = matrix(B.*OMAT_1mHmH)
     C = A′*β
 
-    α = A.*OMAT_1mHmH
+    α = matrix(A.*OMAT_1mHmH)
     B′ = matrix(B)
     C .-= B′*α
     C ./= 8
@@ -217,15 +218,16 @@ function _comm2_2_2(A, B)
     for I in CartesianIndices(C′)
         i, j, k, l = Tuple(I)
 
+        #                P()              P(i,j)           P(k,l)           P(i,j)P(k,l)
         C′[I] += 4 \ (D′[l, j, i, k] - D′[l, i, j, k] - D′[k, j, i, l] + D′[k, i, j, l])
     end
 
     C′
 end
-_comm2_2_2_pw(SPBASIS, A, B, i, j, k, l) = cartesian_sum(2, SPBASIS) do a, b
+_comm2_2_2_pw(A, B, i, j, k, l) = cartesian_sum(2, SPBASIS) do a, b
     prod3(i, j, k, l) = A[a, i, b, k]*B[b, j, a, l]
 
-    8 \ (1-isocc(a)-isocc(b))*(A[i, j, a, b]*B[a, b, k, l] - B[i, k, a, b]*A[a, b, k, l]) #=
+    8 \ (1-isocc(a)-isocc(b))*(A[i, j, a, b]*B[a, b, k, l] - B[i, j, a, b]*A[a, b, k, l]) #=
     =#+ 4 \ (isocc(a)-isocc(b))*(prod3(i, j, k, l) - prod3(j, i, k, l) - prod3(i, j, l, k) #=
              =#+ prod3(j, i, l, k))
 end

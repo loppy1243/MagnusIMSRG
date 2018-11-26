@@ -1,5 +1,5 @@
 module IMOperators
-export IMArrayOp, DenseIMArrayOP, imrank, hconj, mbop
+export IMArrayOp, DenseIMArrayOP, imrank, hconj, mbop, randimop
 using ManyBody
 
 import ..SIGNAL_OPS
@@ -12,13 +12,10 @@ struct IMArrayOp{N, T, AS<:NTuple{N, AbstractArray{T}}}
     b0::Array{T, 0}
     bs::AS
 
-    function IMArrayOp{N, T, AS}(b0::_X{T}, bs::AS) where
-                      {N, T, AS<:NTuple{N, AbstractArray{T}}}
-        for (i, b) in enumerate(bs)
-            @assert ndims(b) == 2i
-        end
+    IMArrayOp{N, T, AS}(b0::T, bs::AS) where {N, T, AS<:NTuple{N, AbstractArray{T}}} =
         new(fill(b0), bs)
-    end
+    IMArrayOp{N, T, AS}(b0::Array{T, 0}, bs::AS) where {N, T, AS<:NTuple{N, AbstractArray{T}}} =
+        new(b0, bs)
 end
 Base.getproperty(op::IMArrayOp, s::Symbol) =
     if s === :parts
@@ -43,12 +40,10 @@ IMArrayOp(b0::_X{T}, bs::AbstractArray{T}...) where T =
 IMArrayOp{N, T, AS}(::UndefInitializer, dims::Vararg{<:Any, N}) where
          {N, T, AS<:NTuple{N, AbstractArray{T}}} =
     IMArrayOp{N, T, AS}(zero(T), Tuple(A(undef, ds) for (A, ds) in zip(AS.types, dims)))
-(O::Type{<:IMArrayOp})(::UndefInitializer, dims...) =
-    O(zero(T), Tuple(A(undef, ds) for (A, ds) in zip(arraytypes(O), dims)))
 
 const DenseIMArrayOp{N, T, AS<:NTuple{N, Array{T}}} = IMArrayOp{N, T, AS}
-arraytypes(O::Type{IMArrayOp{<:Any, <:Any, AS}}) where
-           AS<:(NTuple{<:Any, AbstractArray{T}} where T) = AS
+arraytypes(O::Type{<:IMArrayOp{<:Any, <:Any, AS}}) where
+    AS<:(NTuple{<:Any, AbstractArray{T}} where T) = Tuple(AS.types)
 
 imrank(::Type{<:IMArrayOp{N}}) where N = N
 imrank(op::IMArrayOp) = imrank(typeof(op))
@@ -57,7 +52,7 @@ imrank(a::AbstractArray) = imrank(typeof(a))
 Base.eltype(::Type{<:IMArrayOp{<:Any, T}}) where T = T
 
 # Make into method on Base.size?
-size(op::IMArrayOp) = map(size, op.bs)
+size(op::IMArrayOp) = map(Base.size, op.bs)
 
 Base.zero(O::Type{<:IMArrayOp}) = O(zero(eltype(O)), map(zero, arraytypes(O)))
 function Base.zero(op::IMArrayOp)
@@ -74,9 +69,10 @@ Base.iszero(op::IMArrayOp) = all(iszero, op)
 
 ### Indexing
 ##############################################################################################
-_imoptype(O::Type{<:IMArrayOp}) = O
-_imoptype(op::IMArrayOp) = _imoptype(typeof(op))
 struct Indexer{O<:IMArrayOp}; op::O end
+_imoptype(::Type{<:Indexer{O}}) where O<:IMArrayOp = O
+_imoptype(I::Indexer) = _imoptype(typeof(I))
+
 @inline function Base.getindex(I::Indexer, i::Int)
     @boundscheck i <= imrank(I.op)
     i == 0 ? I.op.b0 : I.op.bs[i]
@@ -90,17 +86,17 @@ Base.lastindex(I::Indexer) = imrank(_imoptype(I))
 Base.IteratorEltype(::Type{<:Indexer}) = Base.EltypeUnknown()
 Base.IteratorSize(::Type{<:Indexer}) = Base.HasLength()
 Base.length(I::Indexer) = imrank(_imoptype(I)) + 1
-function Base.iterate(I::Indexer, st=1)
+function Base.iterate(I::Indexer, st=0)
     st > imrank(I.op) && return nothing
-    st == 1 ? (I.op.b0, st+1) : (I.op.bs[st], st+1)
+    st == 0 ? (I.op.b0, st+1) : (I.op.bs[st], st+1)
 end
 
 Base.IteratorEltype(::Type{<:IMArrayOp}) = Base.HasEltype()
 Base.IteratorSize(::Type{<:IMArrayOp}) = Base.HasLength()
 Base.length(op::IMArrayOp) = sum(length, op.parts)
-function Base.iterate(op::IMArrayOp, (part, inner)=(0, (op.parts[part],)))
-    part > imrank(op) && return nothing
+function Base.iterate(op::IMArrayOp, (part, inner)=(0, (op.parts[0],)))
     if (X = iterate(inner...)) === nothing
+        part == imrank(op) && return nothing
         part += 1
         X = iterate(op.parts[part])
     end
@@ -112,18 +108,22 @@ end
 ##############################################################################################
 
 function Base.map(f, ops::IMArrayOp{N}...) where N
-    @assert all(==(size(ops[1])), ops)
+    sz = IMOperators.size(ops[1])
+    @assert all(ops) do op
+        IMOperators.size(op) == sz
+    end
 
-    T = promote_type(eltype(dest), map(eltype, ops))
-    ret = IMArrayOp{N, T}(undef, size(op[1])...)
+    T = promote_type(map(eltype, ops)...)
+    ret = similar(ops[1], T)
 
-    map!(f, ret, ops)
+    map!(f, ret, ops...)
 end
 
 function Base.map!(f, dest::IMArrayOp{N}, srcs::IMArrayOp{N}...) where N
-    @assert all(==(size(dest)), srcs)
+    @assert all(srcs) do op
+        IMOperators.size(op) == IMOperators.size(dest)
+    end
 
-    @assert all(map(size, dest.parts) .== map(size, src.parts))
     for bs in zip(dest.parts, map(op -> op.parts, srcs)...)
         map!(f, bs[1], bs[2:end]...)
     end
@@ -162,9 +162,9 @@ function hconj(x::AbstractArray{<:Any, 0})
 end
 # Note that we must have `ndims(x) % 2 == 0`
 function hconj(x::AbstractArray)
-    d = ndims(a); @assert d % 2 == 0
+    d = ndims(x); @assert d % 2 == 0
     d2 = div(d, 2)
-    conj.(PermutedDimsArray(x, [d2+1:d... 1:d2...]))
+    conj.(PermutedDimsArray(x, [d2+1:d..., 1:d2...]))
 end
 hconj(x::IMArrayOp) = typeof(x)(map(hconj, x.parts)...)
 Base.adjoint(op::IMArrayOp) = hconj(op)
@@ -176,7 +176,7 @@ Base.similar(O::Type{<:IMArrayOp{N}}, T::Type, dims::Vararg{<:Any, N}) where N =
     similar(O, T, dims)
 Base.similar(O::Type{<:IMArrayOp{N}}, T::Type, dims::NTuple{N}) where N =
     O(fill(T), map(similar, arraytypes(O), dims))
-Base.similar(op::IMArrayOp) = typeof(op)(undef)
+Base.similar(op::IMArrayOp) = typeof(op)(map(similar, op.parts)...)
 Base.similar(op::IMArrayOp, T::Type) = IMArrayOp(map(x -> similar(x, T), op.parts)...)
 Base.similar(op::IMArrayOp, dims...) = similar(typeof(op), dims...)
 Base.similar(op::IMArrayOp, T::Type, dims...) = similar(typeof(op), T, dims...)
@@ -215,5 +215,14 @@ function mbop(op::IMArrayOp{2}, B1, B2)
 end
 
 randimop(T, dims...) = IMArrayOp(rand(T), map(ds -> rand(T, ds), dims)...)
+
+function Base.show(io::IO, mime::MIME"text/plain", op::IMArrayOp)
+    println(typeof(op))
+    for i = 0:imrank(op)
+        print("$i-Body Part: ")
+        show(io, mime, op.parts[i])
+        println()
+    end
+end
 
 end # module IMOperators
