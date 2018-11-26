@@ -9,9 +9,9 @@ version = "0.8.10"
 
 [[BinaryProvider]]
 deps = ["Libdl", "Pkg", "SHA", "Test"]
-git-tree-sha1 = "9930c1a6cd49d9fcd7218df6be417e6ae4f1468a"
+git-tree-sha1 = "055eb2690182ebc31087859c3dd8598371d3ef9e"
 uuid = "b99e7846-7c00-51b0-8f62-c81ae34c0232"
-version = "0.5.2"
+version = "0.5.3"
 
 [[Calculus]]
 deps = ["Compat"]
@@ -157,9 +157,9 @@ version = "0.1.1"
 
 [[JSON]]
 deps = ["Dates", "Distributed", "Mmap", "Sockets", "Test", "Unicode"]
-git-tree-sha1 = "fec8e4d433072731466d37ed0061b3ba7f70eeb9"
+git-tree-sha1 = "1f7a25b53ec67f5e9422f1f551ee216503f4a0fa"
 uuid = "682c06a0-de6a-54ab-a142-c8b1cf79cde6"
-version = "0.19.0"
+version = "0.20.0"
 
 [[JuliaUtil]]
 deps = ["SpecialFunctions"]
@@ -196,7 +196,7 @@ version = "0.4.4"
 
 [[ManyBody]]
 deps = ["Combinatorics", "Reexport"]
-git-tree-sha1 = "98f627ebd7bea11179d39213089e737cb34c49b3"
+git-tree-sha1 = "e53f3f9687948b07f91169f190c63b16f3d5c55e"
 repo-rev = "simplified"
 repo-url = "https://github.com/loppy1243/ManyBody"
 uuid = "59cbdfb0-9bfb-11e8-2ea2-0574352e373b"
@@ -259,9 +259,9 @@ version = "4.17.2"
 
 [[Parameters]]
 deps = ["Markdown", "OrderedCollections", "REPL", "Test"]
-git-tree-sha1 = "40f540ec96e50c0b2b9efdb11b5e4d0c63f90923"
+git-tree-sha1 = "eec0fe16344cc14aa2e6251874ab30d62aff4f7c"
 uuid = "d96e819e-fc66-5662-9728-84c9c7592b0a"
-version = "0.10.1"
+version = "0.10.2"
 
 [[Pkg]]
 deps = ["Dates", "LibGit2", "Markdown", "Printf", "REPL", "Random", "SHA", "UUIDs"]
@@ -311,9 +311,9 @@ version = "0.6.0"
 
 [[RecursiveArrayTools]]
 deps = ["RecipesBase", "Requires", "StaticArrays", "Statistics", "Test"]
-git-tree-sha1 = "24dd0469af1479902590e3b2d266b5058cf6f6c9"
+git-tree-sha1 = "5ac1ea7d018bec90b0be614a9a37d1fd80dce8d9"
 uuid = "731186ca-8d62-57ce-b412-fbd966d074cd"
-version = "0.18.3"
+version = "0.18.4"
 
 [[Reexport]]
 deps = ["Pkg"]
@@ -329,9 +329,9 @@ version = "0.5.2"
 
 [[Roots]]
 deps = ["Compat", "Printf"]
-git-tree-sha1 = "9a66815d2530705097a5668efa8b88aa238ada47"
+git-tree-sha1 = "2e7171b6f3b58b81201ba37d9e1220aff6d904a1"
 uuid = "f2b01f46-fcfa-551c-844a-d8ac1e96c665"
-version = "0.7.3"
+version = "0.7.4"
 
 [[SHA]]
 uuid = "ea8e919c-243c-51af-8825-aaa63cd721ce"
@@ -370,9 +370,9 @@ version = "0.7.2"
 
 [[StaticArrays]]
 deps = ["InteractiveUtils", "LinearAlgebra", "Random", "Statistics", "Test"]
-git-tree-sha1 = "ebc5c2a27d91d5ec611a9861168182e2168effd3"
+git-tree-sha1 = "97c4bf0f647488dd7ac01ea12be5885f88762938"
 uuid = "90137ffa-7385-5640-81b9-e52037218182"
-version = "0.9.2"
+version = "0.10.0"
 
 [[Statistics]]
 deps = ["LinearAlgebra", "SparseArrays"]
@@ -380,9 +380,9 @@ uuid = "10745b16-79ce-11e8-11f9-7d13ad32a3b2"
 
 [[StatsBase]]
 deps = ["DataStructures", "LinearAlgebra", "Missings", "Printf", "Random", "SortingAlgorithms", "SparseArrays", "Statistics", "Test"]
-git-tree-sha1 = "723193a13e8078cec6dcd0b8fe245c8bfd81690e"
+git-tree-sha1 = "2722397d88f8ffef551948f6c20e1d74a743298c"
 uuid = "2913bbd2-ae8a-5f71-8c99-4fb6c76f3a91"
-version = "0.25.0"
+version = "0.26.0"
 
 [[SuiteSparse]]
 deps = ["Libdl", "LinearAlgebra", "SparseArrays"]

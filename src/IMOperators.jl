@@ -1,8 +1,10 @@
 module IMOperators
 export IMArrayOp, DenseIMArrayOP, imrank, hconj, mbop
+using ManyBody
 
-#import LinearAlgebra
-#using LinearAlgebra: I
+import ..SIGNAL_OPS
+
+SIGNAL_OPS && include("signalops.jl")
 
 const _X{T} = Union{T, Array{T, 0}}
 
@@ -32,7 +34,7 @@ function IMArrayOp{N, T, AS}(b0::_X{T}, bs::Vararg{AbstractArray{T}, N}) where
 end
 IMArrayOp{N, T}(b0::_X{T}, bs::Vararg{AbstractArray{T}, N}) where {N, T} =
     IMArrayOp{N, T, typeof(bs)}(b0, bs)
-IMArrayOp{N}(b0::_X{T}, bs::Vararg{AbstractArray{T}, N}) where T =
+IMArrayOp{N}(b0::_X{T}, bs::Vararg{AbstractArray{T}, N}) where {N, T} =
     IMArrayOp{N, _X{T}, typeof(bs)}(b0, bs)
 IMArrayOp(b0::_X{T}, bs::AbstractArray{T}...) where T =
     IMArrayOp{length(bs), T, typeof(bs)}(b0, bs)
@@ -47,8 +49,6 @@ IMArrayOp{N, T, AS}(::UndefInitializer, dims::Vararg{<:Any, N}) where
 const DenseIMArrayOp{N, T, AS<:NTuple{N, Array{T}}} = IMArrayOp{N, T, AS}
 arraytypes(O::Type{IMArrayOp{<:Any, <:Any, AS}}) where
            AS<:(NTuple{<:Any, AbstractArray{T}} where T) = AS
-arraytypes(O::Type{IMArrayOp{N, T}}) = Tuple(arraytype(O, n) for n = 1:imrank(O))
-arraytype(O::Type{<:DenseIMArrayOp, n}) = Array{eltype(O), 2n}
 
 imrank(::Type{<:IMArrayOp{N}}) where N = N
 imrank(op::IMArrayOp) = imrank(typeof(op))
@@ -58,6 +58,19 @@ Base.eltype(::Type{<:IMArrayOp{<:Any, T}}) where T = T
 
 # Make into method on Base.size?
 size(op::IMArrayOp) = map(size, op.bs)
+
+Base.zero(O::Type{<:IMArrayOp}) = O(zero(eltype(O)), map(zero, arraytypes(O)))
+function Base.zero(op::IMArrayOp)
+    z = zero(eltype(op))
+
+    ret = similar(op)
+    for part in ret.parts
+        fill!(part, z)
+    end
+
+    ret
+end
+Base.iszero(op::IMArrayOp) = all(iszero, op)
 
 ### Indexing
 ##############################################################################################
@@ -75,18 +88,30 @@ Base.lastindex(I::Indexer) = imrank(_imoptype(I))
 ### Iteration
 ##############################################################################################
 Base.IteratorEltype(::Type{<:Indexer}) = Base.EltypeUnknown()
-Base.IteratorSize(IT::Type{<:Indexer}) = Base.HasLength()
-
+Base.IteratorSize(::Type{<:Indexer}) = Base.HasLength()
+Base.length(I::Indexer) = imrank(_imoptype(I)) + 1
 function Base.iterate(I::Indexer, st=1)
     st > imrank(I.op) && return nothing
     st == 1 ? (I.op.b0, st+1) : (I.op.bs[st], st+1)
 end
-Base.length(I::Index) = imrank(_imoptype(I)) + 1
+
+Base.IteratorEltype(::Type{<:IMArrayOp}) = Base.HasEltype()
+Base.IteratorSize(::Type{<:IMArrayOp}) = Base.HasLength()
+Base.length(op::IMArrayOp) = sum(length, op.parts)
+function Base.iterate(op::IMArrayOp, (part, inner)=(0, (op.parts[part],)))
+    part > imrank(op) && return nothing
+    if (X = iterate(inner...)) === nothing
+        part += 1
+        X = iterate(op.parts[part])
+    end
+
+    (X[1], (part, (op.parts[part], X[2])))
+end
 
 ### Operations
 ##############################################################################################
 
-function Base.map(f, ops::IMArrayOp{N}...)
+function Base.map(f, ops::IMArrayOp{N}...) where N
     @assert all(==(size(ops[1])), ops)
 
     T = promote_type(eltype(dest), map(eltype, ops))
@@ -113,11 +138,10 @@ else
 end
 
 for op in (:+, :-)
-    @eval begin
-        Base.$op(a::IMArrayOp{N}, b::IMArrayOp{N}) where N = map($op, a, b)
-        Base.$op(a::IMArrayOp) = map($op, a)
-    end
+    @eval Base.$op(a::IMArrayOp{N}, b::IMArrayOp{N}) where N = map($op, a, b)
 end
+Base.:+(a::IMArrayOp) = a
+Base.:-(a::IMArrayOp) = map(-, a)
 for op in (:*, :/)
     @eval Base.$op(a::IMArrayOp, b::Number) = map(x -> $op(x, b), a)
 end
@@ -138,12 +162,12 @@ function hconj(x::AbstractArray{<:Any, 0})
 end
 # Note that we must have `ndims(x) % 2 == 0`
 function hconj(x::AbstractArray)
-    d = ndims(a)
+    d = ndims(a); @assert d % 2 == 0
     d2 = div(d, 2)
     conj.(PermutedDimsArray(x, [d2+1:d... 1:d2...]))
 end
 hconj(x::IMArrayOp) = typeof(x)(map(hconj, x.parts)...)
-Base.ctranspose(op::IMArrayOp) = hconj(op)
+Base.adjoint(op::IMArrayOp) = hconj(op)
 
 norm(op::IMArrayOp) = sqrt(sum(x -> sum(x.^2), op.parts))
 
@@ -167,14 +191,12 @@ function ManyBody.tabulate!(fs, op::IMArrayOp, Bs::Tuple)
     op
 end
 
-### Update Line ##############################################################################
-
 mbop(op, B) = mbop(op, B, B)
 function mbop(op::IMArrayOp{2}, B1, B2)
     T = eltype(op)
     E, f, Γ = op.parts
 
-    tabulate(typeof(op.parts[1]), B1, B2) do X, Y
+    tabulate(Array{eltype(op)}, B1, B2) do X, Y
         SPB = spbasis(Y)
 
         ret = E*overlap(X, Y)

@@ -1,30 +1,20 @@
-using MagnusIMSRG: DIM, comm2, comm2_pw, randop, ZERO_OP, hermiticize
+using MagnusIMSRG.IMOperators
+using MagnusIMSRG.Commutators: comm2, comm2_pw
 
 commtest(; atol) = @testset "Commutators" begin
-    op_1 = randop()
-    op_2 = randop()
+    op1 = randimop(Float64, (6, 6), (6, 6, 6, 6))
+    op2 = randimop(Float64, (6, 6), (6, 6, 6, 6))
 
-    mat_E, mat_f, mat_Γ = comm2(op_1, op_2)
-    pw_E, pw_f, pw_Γ = comm2_pw(op_1, op_2)
+    mat_comm = comm2(op1, op2)
+    pw_comm = comm2_pw(op1, op2)
+    @test within_tol(mat_comm - pw_comm)
 
-    @test abs(mat_E - pw_E) < atol
-    @test all(abs.(mat_f.rep .- pw_f.rep) .< atol)
-    @test all(abs.(mat_Γ.rep .- pw_Γ.rep) .< atol)
+    op1 = (op1 + op1')/2
+    op2 = (op2 + op2')/2
+    mat_comm = comm2(op1, op2)
+    @test within_tol((mat_comm + mat_comm')/2)
 
-    op_1 = hermiticize(op_1)
-    op_2 = hermiticize(op_2)
-
-    mat_E, mat_f, mat_Γ = comm2(op_1, op_2)
-
-    @test abs(mat_E) < atol
-    @test all(abs.(mat_f.rep + mat_f.rep') .< atol)
-    @test all(abs.(mat_Γ.rep + PermutedDimsArray(mat_Γ.rep, [3, 4, 1, 2])) .< atol)
-
-    op_1 = ZERO_OP
-
-    mat_E, mat_f, mat_Γ = comm2(op_1, op_2)
-
-    @test abs(mat_E) < atol
-    @test all(abs.(mat_f.rep) .< atol)
-    @test all(abs.(mat_Γ.rep) .< atol)
+    op1 = zero(op1)
+    mat_comm = comm2(op1, op2)
+    @test within_tol(mat_comm)
 end
