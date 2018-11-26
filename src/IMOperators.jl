@@ -1,5 +1,5 @@
 module IMOperators
-export IMArrayOp, DenseIMArrayOp, imrank, hconj, mbop, randimop
+export IMArrayOp, imrank, hconj, mbop, randimop
 using ManyBody
 
 import ..SIGNAL_OPS
@@ -40,8 +40,6 @@ IMArrayOp(b0::_X{T}, bs::AbstractArray{T}...) where T =
 IMArrayOp{N, T, AS}(::UndefInitializer, dims::Vararg{<:Any, N}) where
          {N, T, AS<:NTuple{N, AbstractArray{T}}} =
     IMArrayOp{N, T, AS}(zero(T), Tuple(A(undef, ds) for (A, ds) in zip(AS.types, dims)))
-
-const DenseIMArrayOp{N, T, AS<:NTuple{N}} = IMArrayOp{N, T, AS}
 
 arraytypes(O::Type{<:IMArrayOp{<:Any, <:Any, AS}}) where AS = Tuple(AS.types)
 

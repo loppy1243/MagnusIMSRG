@@ -1,18 +1,17 @@
 module RunMagnusIMSRG
-
-import MagnusIMSRG
-
-using ManyBody
+using ManyBody, MagnusIMSRG.IMOperators
 using Plots; gr()
-using MagnusIMSRG: @getparams
+
+using MagnusIMSRG: @localgetparams
+import MagnusIMSRG.Hamiltonians: impairing
 using LinearAlgebra: eigvals
 
 Plots.default(legend=false, dpi=200, grid=false)
 
 function run(; magnus=true)
-    @getparams SPBASIS, ELTYPE
+    @localgetparams SPBASIS, ELTYPE, REFSTATE
 
-    h0 = tabulate(Hamiltonians.impairing(1, 0.5), DenseIMArrayOp{2, ELTYPE}, SPBASIS)
+    h0 = tabulate(impairing(REFSTATE, 1, 0.5), IMArrayOp{2, ELTYPE}, SPBASIS)
     exact_eigs = eigvals(mbop(h0)) |> sort
     E∞ = exact_eigs[argmin(abs.(exact_eigs.-h0.parts[0][]))]
     D = length(exact_eigs)
@@ -50,4 +49,4 @@ end
 
 end # module RunMagnusIMSRG
 
-RunMagnusIMSRG.run()
+#RunMagnusIMSRG.run()
