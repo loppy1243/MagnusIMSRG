@@ -1,5 +1,10 @@
+if isdefined(Main, :RunMagnusIMSRG)
+    reload(RunMagnusIMSRG, :ManyBody)
+    reload(RunMagnusIMSRG, :MagnusIMSRG)
+end
+
 module RunMagnusIMSRG
-using ManyBody, MagnusIMSRG.IMOperators
+using ManyBody, MagnusIMSRG, MagnusIMSRG.IMOperators
 using Plots; gr()
 
 using MagnusIMSRG: @localgetparams
@@ -9,9 +14,12 @@ using LinearAlgebra: eigvals
 Plots.default(legend=false, dpi=200, grid=false)
 
 function run(; magnus=true)
-    @localgetparams SPBASIS, ELTYPE, REFSTATE
+    @localgetparams SPBASIS, ELTYPE, REFSTATE, MBBASIS
 
-    h0 = tabulate(impairing(REFSTATE, 1, 0.5), IMArrayOp{2, ELTYPE}, SPBASIS)
+    mbop(op) = IMOperators.mbop(op, REFSTATE, MBBASIS, MBBASIS)
+
+    h0 = tabulate(impairing(REFSTATE, 1, 0.5), IMArrayOp{2, ELTYPE},
+                  (Array, 2, SPBASIS), (Array, 4, SPBASIS))
     exact_eigs = eigvals(mbop(h0)) |> sort
     E∞ = exact_eigs[argmin(abs.(exact_eigs.-h0.parts[0][]))]
     D = length(exact_eigs)
@@ -49,4 +57,4 @@ end
 
 end # module RunMagnusIMSRG
 
-#RunMagnusIMSRG.run()
+RunMagnusIMSRG.run()

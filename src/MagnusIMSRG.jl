@@ -12,63 +12,8 @@ const SIGNAL_OPS = false
 
 ### Parameters ###############################################################################
 ##############################################################################################
-#@with_kw struct HyParams
-#    ENG_DENOM_ATOL  ::Float64                  = 1e-5
-#
-#    Ω_RTOL          ::Float64                  = 0.0
-#    Ω_ATOL          ::Float64                  = 0.01
-#    Ω_BATCHSIZE     ::Float64                  = 5
-#
-#    H_RTOL          ::Float64                  = 0.0
-#    H_ATOL          ::Float64                  = 0.01
-#    H_BATCHSIZE     ::Int                      = 5
-#
-#    INT_RTOL        ::Float64                  = 1e-8
-#    INT_ATOL        ::Float64                  = 1e-3
-#    INT_DIV_RTHRESH ::Float64                  = 1.0
-#    MAX_INT_ITERS   ::Int                      = 100
-#
-#    ELTYPE          ::Type                     = Float64
-#    MBBASIS         ::Type                     = Bases.Paired{4, 4}
-#    SPBASIS         ::Type                     = spbasis(MBBASIS)
-#    DIM             ::Int                      = dim(spbasis)
-#    REFSTATE        ::Union{RefState, MBBasis} = RefStates.Fermi{SPBASIS}(2)
-#    HOLES           ::Vector{SPBASIS}          = holes(REFSTATE)
-#    PARTS           ::Vector{SPBASIS}          = parts(REFSTATE)
-#end
 
-@with_kw struct Params
-    S_LARGE_STEP    ::Float64                  = 1.0
-    S_SMALL_STEP    ::Float64                  = 0.1
-    TRUNC_LEVEL     ::Int                      = 2
-    COMMUTATOR      ::Symbol                   = :comm2
-    GENERATOR       ::Symbol                   = :white
-    ENG_DENOM_ATOL  ::Float64                  = 1e-5
-
-    Ω_RTOL          ::Float64                  = 0.0
-    Ω_ATOL          ::Float64                  = 0.01
-    Ω_BATCHSIZE     ::Float64                  = 5
-
-    H_RTOL          ::Float64                  = 0.0
-    H_ATOL          ::Float64                  = 0.01
-    H_BATCHSIZE     ::Int                      = 5
-
-    INT_RTOL        ::Float64                  = 1e-8
-    INT_ATOL        ::Float64                  = 1e-3
-    INT_DIV_RTHRESH ::Float64                  = 1.0
-    MAX_INT_ITERS   ::Int                      = 100
-    PRINT_INFO      ::Bool                     = true
-
-
-    ELTYPE          ::Type                     = Float64
-    MBBASIS         ::Type                     = Bases.Paired{4, 4}
-    SPBASIS         ::Type                     = spbasis(supbasis(MBBASIS))
-    DIM             ::Int                      = dim(SPBASIS)
-    REFSTATE        ::Union{RefState, MBBasis} = RefStates.Fermi{SPBASIS}(2)
-    HOLES           ::Vector                   = holes(REFSTATE)
-    PARTS           ::Vector                   = parts(REFSTATE)
-end
-
+include("parameters.jl")
 const PARAMS = Params()
 include("getparams.jl")
 
@@ -133,7 +78,7 @@ end
 solve(h0) = solve((xs...,) -> nothing, h0)
 function solve(cb, h0::IMArrayOp; kws...)
     @localgetparams(ELTYPE, INT_ATOL, INT_RTOL, MAX_INT_ITERS, INT_DIV_ATOL,
-                    INT_DIV_RTOL, SPBASIS, PRINT_INFO)
+                    INT_DIV_RTOL, SPBASIS, PRINT_INFO, S_SMALL_STEP)
 
     s = 0.0
     n = 0
@@ -143,7 +88,7 @@ function solve(cb, h0::IMArrayOp; kws...)
 
     while abs(dE_2) > choosetol(INT_ATOL, INT_RTOL*abs(h.parts[0][]))
         ratio = dE_2/h.parts[0][]
-        if n >= max_int_iters
+        if n >= MAX_INT_ITERS
             @warn "Iteration maximum exceeded in solve()" n s
             break
         end
@@ -151,16 +96,16 @@ function solve(cb, h0::IMArrayOp; kws...)
             @warn "Divergence threshold exceeded in solve()" n s ratio
             break
         end
-        PRINT_INFO && _solve_print_info(n, max_int_iters, h.parts[0][], dE_2, ratio)
+        PRINT_INFO && _solve_print_info(n, h.parts[0][], dE_2, ratio)
         cb(s, Ω, h, dE_2)
 
-        Ω += dΩ(Ω, h) * ds
-        s += ds
+        Ω += dΩ(Ω, h) * S_SMALL_STEP
+        s += S_SMALL_STEP
         h = H(Ω, h0)
         dE_2 = mbpt2(h)
         n += 1
     end
-    PRINT_INFO && _solve_print_info(n, max_int_iters, h.parts[0][], dE_2, ratio)
+    PRINT_INFO && _solve_print_info(n, h.parts[0][], dE_2, dE_2/h.parts[0])
     cb(s, Ω, h, dE_2)
 
     Ω
@@ -170,7 +115,7 @@ const ALG = AutoTsit5(Rosenbrock23())
 solve_nomagnus(h0) = solve_nomagnus((xs...,) -> nothing, h0)
 function solve_nomagnus(cb, h0)
     @localgetparams(ELTYPE, INT_ATOL, INT_RTOL, MAX_INT_ITERS, INT_DIV_ATOL,
-                    INT_DIV_RTOL, SPBASIS, PRINT_INFO)
+                    INT_DIV_RTOL, SPBASIS, PRINT_INFO, S_LARGE_STEP)
     s = 0.0
     n = 0
     h = h0
@@ -181,7 +126,7 @@ function solve_nomagnus(cb, h0)
 
     while abs(dE_2) > choosetol(INT_ATOL, INT_RTOL*abs(h.parts[0][]))
         ratio = dE_2/h.parts[0][]
-        if n >= max_int_iters
+        if n >= MAX_INT_ITERS
             @warn "Iteration maximum exceeded in solve()" n s
             break
         end
@@ -189,7 +134,7 @@ function solve_nomagnus(cb, h0)
             @warn "Divergence threshold exceeded in solve()" n s ratio
             break
         end
-        PRINT_INFO && _solve_print_info(n, max_int_iters, h.parts[0][], dE_2, ratio)
+        PRINT_INFO && _solve_print_info(n, h.parts[0][], dE_2, ratio)
         cb(s, Ω, h, dE_2)
 
         solve!(integrator)
@@ -198,14 +143,15 @@ function solve_nomagnus(cb, h0)
         s += S_LARGE_STEP; add_tstop!(integrator, s+S_LARGE_STEP)
         n += 1
     end
-    PRINT_INFO && _solve_print_info(n, max_int_iters, h.parts[0][], dE_2, ratio)
+    PRINT_INFO && _solve_print_info(n, h.parts[0][], dE_2, ratio)
     cb(s, Ω, h, dE_2)
 
     h
 end
 
-function _solve_print_info(n, max_int_iters, E, dE_2, r)
+function _solve_print_info(n, E, dE_2, r)
     try
+        @localgetparams MAX_INT_ITERS, INT_RTOL
         sigdigs = 5
 
         decdigs(x) = sigdigs - ndigits(trunc(Int, x))
@@ -214,7 +160,7 @@ function _solve_print_info(n, max_int_iters, E, dE_2, r)
         r_decdigs = nzdecdig(INT_RTOL)
         E_decdigs = decdigs(E)
 
-        n = lpad(n, ndigits(max_int_iters))
+        n = lpad(n, ndigits(MAX_INT_ITERS))
 
         r = round(r, digits=r_decdigs)
         r = rpad(r, ndigits(trunc(Int, r))+1+r_decdigs, '0')

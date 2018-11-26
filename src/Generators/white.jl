@@ -38,7 +38,7 @@ function white(h::IMArrayOp{2})
     ret_f = ret.parts[1]; ret_Γ = ret.parts[2]
 
     for i in PARTS, j in HOLES
-        ret_f[i, j] = f′(i, j) - f′(j, j)
+        ret_f[i, j] = f′(i, j) - f′(j, i)
     end
     for i in PARTS, j in PARTS, k in HOLES, l in HOLES
         ret_Γ[i, j, k, l] = Γ′(i, j, k, l) - Γ′(k, l, i, j)
