@@ -13,9 +13,7 @@ commtest(; atol) = @testset "Commutators" begin
 
     mat_comm = comm2(op1, op2)
     pw_comm = comm2_pw(op1, op2)
-    diff = mat_comm - pw_comm
-    show(stdout, "text/plain", diff)
-    @test within_tol(diff)
+    @test within_tol(mat_comm - pw_comm)
 
     op1 = (op1 + op1')/2
     op2 = (op2 + op2')/2

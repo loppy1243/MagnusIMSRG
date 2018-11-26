@@ -11,5 +11,14 @@ impairingtest(; atol) = @testset "IMPairing Hamiltonian" begin
                     (Array, 2, SPB), (Array, 4, SPB))
     h_mb = mbop(h_im, MB, MB)
 
-    @test all(x -> abs(x) < atol, h_mb - h_true)
+    diff = h_mb - h_true
+
+    print("Correct: ")
+    show(stdout, "text/plain", h_true); println(); println()
+    print("From impairing(): ")
+    show(stdout, "text/plain", h_mb); println(); println()
+    print("Difference: ")
+    show(stdout, "text/plain", diff); println()
+
+    @test all(x -> abs(x) < atol, diff)
 end

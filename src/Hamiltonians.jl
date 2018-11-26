@@ -1,21 +1,20 @@
 module Hamiltonians
+using ManyBody
 
 import ..SIGNAL_OPS
 
 SIGNAL_OPS && include("signalops.jl")
 
-function impairing2(ref, δ, g)
-    self_int = g/4*nocc(ref)
-
+function impairing(ref, δ, g)
     E = sum(occ(ref)) do i
-        δ*(i.level - 1)
-    end - self_int
+        δ*(i.level-1) - g/4*isocc(ref, flipspin(i))
+    end
 
-    f = (p, q) -> (p == q)*(δ*(p.level-1) - self_int)
+    f(p, q) = (p == q)*(δ*(p.level-1) - g/2*isocc(ref, flipspin(p)))
 
-    Γ = function(p, q, r, s)
+    function Γ(p, q, r, s)
         mask = (p.level == q.level)*(r.level == s.level) #=
-            =# * spinup(p)*spinup(r)*spindown(q)*spindown(s)
+            =# * spinup(p)*spindown(q)*spindown(s)*spinup(r)
 
         -g/2*mask
     end
