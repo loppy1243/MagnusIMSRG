@@ -1,5 +1,5 @@
 module IMOperators
-export IMArrayOp, DenseIMArrayOP, imrank, hconj, mbop, randimop
+export IMArrayOp, DenseIMArrayOp, imrank, hconj, mbop, randimop
 using ManyBody
 
 import ..SIGNAL_OPS
@@ -41,9 +41,9 @@ IMArrayOp{N, T, AS}(::UndefInitializer, dims::Vararg{<:Any, N}) where
          {N, T, AS<:NTuple{N, AbstractArray{T}}} =
     IMArrayOp{N, T, AS}(zero(T), Tuple(A(undef, ds) for (A, ds) in zip(AS.types, dims)))
 
-const DenseIMArrayOp{N, T, AS<:NTuple{N, Array{T}}} = IMArrayOp{N, T, AS}
-arraytypes(O::Type{<:IMArrayOp{<:Any, <:Any, AS}}) where
-    AS<:(NTuple{<:Any, AbstractArray{T}} where T) = Tuple(AS.types)
+const DenseIMArrayOp{N, T, AS<:NTuple{N}} = IMArrayOp{N, T, AS}
+
+arraytypes(O::Type{<:IMArrayOp{<:Any, <:Any, AS}}) where AS = Tuple(AS.types)
 
 imrank(::Type{<:IMArrayOp{N}}) where N = N
 imrank(op::IMArrayOp) = imrank(typeof(op))
@@ -181,10 +181,14 @@ Base.similar(op::IMArrayOp, T::Type) = IMArrayOp(map(x -> similar(x, T), op.part
 Base.similar(op::IMArrayOp, dims...) = similar(typeof(op), dims...)
 Base.similar(op::IMArrayOp, T::Type, dims...) = similar(typeof(op), T, dims...)
 
-ManyBody.tabulate(fs, O::Type{<:IMArrayOp}, B::AbstractBasis) =
-    tabulate(fs, O, Tuple(B for _=1:imrank(O)))
-ManyBody.tabulate(fs, O::Type{<:IMArrayOp}, Bs::Tuple) =
-    O(fill(fs[1]), map(tabulate, fs[2:end], arraytypes(O), Bs) |> Tuple)
+ManyBody.tabulate(fs, O::Type{<:IMArrayOp}, Bs::Tuple{Type{<:AbstractArray}, Vararg{Any}}) =
+    tabulate(fs, O, (Bs,))
+function ManyBody.tabulate(fs, O::Type{<:IMArrayOp}, Bs::Tuple)
+    As = map(x -> x[1]{eltype(O)}, Bs)
+    Bs = map(x -> Base.tail(x), Bs)
+    IMArrayOp(fill(fs[1]), map(tabulate, fs[2:end], As, Bs)...)
+end
+
 function ManyBody.tabulate!(fs, op::IMArrayOp, Bs::Tuple)
     op.parts[0][] = fs[1]
     foreach(tabulate!, fs[2:end], op.parts[1:end], Bs)
@@ -201,16 +205,16 @@ function mbop(op::IMArrayOp{2}, B1, B2)
 
         ret = E*overlap(X, Y)
         for p in SPB, q in SPB
-            NA = normord(Operators.@A(p', q))
-            ret += f[p, q] * NA(X, Y)
+            sgn, NA = normord(Operators.@A(p', q))
+            ret += sgn*f[p, q]*NA(X, Y)
         end
        
         for p in SPB, q in SPB, r in SPB, s in SPB
-            NA = normord(Operators.@A(p', q', s, r))
-            ret += Γ[p, q, r, s] * NA(X, Y)
+            sgn, NA = normord(Operators.@A(p', q', s, r))
+            ret += sgn*Γ[p, q, r, s]*NA(X, Y)
         end
 
-        b0 + b1 + b2
+        ret
     end
 end
 
