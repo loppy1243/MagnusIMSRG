@@ -196,7 +196,7 @@ version = "0.4.4"
 
 [[ManyBody]]
 deps = ["Combinatorics", "Reexport"]
-git-tree-sha1 = "6b4833aace49523198d800931b66e657dde0e1aa"
+git-tree-sha1 = "5f539e5f1e2436a936946f4955e44a2a8d3c4d6b"
 repo-rev = "simplified"
 repo-url = "https://github.com/loppy1243/ManyBody"
 uuid = "59cbdfb0-9bfb-11e8-2ea2-0574352e373b"

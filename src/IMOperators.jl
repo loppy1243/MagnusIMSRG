@@ -182,9 +182,10 @@ Base.similar(op::IMArrayOp, T::Type, dims...) = similar(typeof(op), T, dims...)
 ManyBody.tabulate(fs, O::Type{<:IMArrayOp}, Bs::Tuple{Type{<:AbstractArray}, Vararg{Any}}) =
     tabulate(fs, O, (Bs,))
 function ManyBody.tabulate(fs, O::Type{<:IMArrayOp}, Bs::Tuple)
-    As = map(x -> x[1]{eltype(O)}, Bs)
+    T = eltype(O)
+    As = map(x -> x[1]{T}, Bs)
     Bs = map(x -> Base.tail(x), Bs)
-    IMArrayOp(fill(fs[1]), map(tabulate, fs[2:end], As, Bs)...)
+    IMArrayOp(fill(convert(T, fs[1])), map(tabulate, fs[2:end], As, Bs)...)
 end
 
 function ManyBody.tabulate!(fs, op::IMArrayOp, Bs::Tuple)
@@ -193,8 +194,7 @@ function ManyBody.tabulate!(fs, op::IMArrayOp, Bs::Tuple)
     op
 end
 
-mbop(op, B) = mbop(op, B, B)
-function mbop(op::IMArrayOp{2}, B1, B2)
+function mbop(op::IMArrayOp{2}, ref, B1, B2)
     T = eltype(op)
     E, f, Γ = op.parts
 
@@ -203,12 +203,12 @@ function mbop(op::IMArrayOp{2}, B1, B2)
 
         ret = E*overlap(X, Y)
         for p in SPB, q in SPB
-            sgn, NA = normord(Operators.@A(p', q))
+            sgn, NA = normord(ref, Operators.@A(p', q))
             ret += sgn*f[p, q]*NA(X, Y)
         end
        
         for p in SPB, q in SPB, r in SPB, s in SPB
-            sgn, NA = normord(Operators.@A(p', q', s, r))
+            sgn, NA = normord(ref, Operators.@A(p', q', s, r))
             ret += sgn*Γ[p, q, r, s]*NA(X, Y)
         end
 

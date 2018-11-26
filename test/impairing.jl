@@ -9,7 +9,7 @@ impairingtest(; atol) = @testset "IMPairing Hamiltonian" begin
     h_true = tabulate(pairing(1, 0.5), Array{Float64}, 2, MB)
     h_im = tabulate(impairing(REF, 1, 0.5), IMArrayOp{2, Float64},
                     (Array, 2, SPB), (Array, 4, SPB))
-    h_mb = mbop(h_im, MB, MB)
+    h_mb = mbop(h_im, REF, MB, MB)
 
     diff = h_mb - h_true
 

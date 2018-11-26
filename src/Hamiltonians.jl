@@ -6,8 +6,8 @@ import ..SIGNAL_OPS
 SIGNAL_OPS && include("signalops.jl")
 
 function impairing(ref, δ, g)
-    E = sum(occ(ref)) do i
-        δ*(i.level-1) - g/4*isocc(ref, flipspin(i))
+    E = sum(occ(ref)) do p
+        δ*(p.level-1) - g/4*isocc(ref, flipspin(p))
     end
 
     f(p, q) = (p == q)*(δ*(p.level-1) - g/2*isocc(ref, flipspin(p)))
