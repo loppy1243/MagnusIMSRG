@@ -76,7 +76,7 @@ function H(Ω, h0)
 end
 
 solve(h0) = solve((xs...,) -> nothing, h0)
-function solve(cb, h0::IMArrayOp; kws...)
+function solve(cb, h0::IMArrayOp)
     @localgetparams(ELTYPE, INT_ATOL, INT_RTOL, MAX_INT_ITERS, INT_DIV_ATOL,
                     INT_DIV_RTOL, SPBASIS, PRINT_INFO, S_SMALL_STEP)
 

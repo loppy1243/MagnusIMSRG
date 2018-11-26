@@ -38,7 +38,7 @@ function run(; magnus=true)
     plt = plot(layout=(2, 1), E_plt, eig_diff_plt)
 
     solve = magnus ? MagnusIMSRG.solve : MagnusIMSRG.solve_nomagnus
-    solve(h0; max_int_iters=20, ds=0.5) do s, Ω, h, dE
+    solve(h0) do s, Ω, h, dE
         E = h.parts[0][]
         new_eigs = mbop(h) |> eigvals |> sort
 
@@ -57,4 +57,4 @@ end
 
 end # module RunMagnusIMSRG
 
-RunMagnusIMSRG.run()
+RunMagnusIMSRG.run(magnus=false)
