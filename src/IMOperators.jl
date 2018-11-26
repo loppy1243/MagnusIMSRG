@@ -112,6 +112,10 @@ _imoptype(v::VectorView) = _imoptype(typeof(v))
 
 Base.vec(op::IMArrayOp) = VectorView(op)
 IMArrayOp(v::VectorView) = v.op
+Base.convert(::Type{Vector}, v::VectorView) = collect(v)
+Base.convert(::Type{Vector{T}}, v::VectorView{T}) where T = collect(v)
+Base.convert(::Type{Vector}, op::IMArrayOp) = collect(vec(op))
+Base.convert(::Type{Vector{T}}, op::IMArrayOp{T}) where T = collect(vec(op))
 
 ## AbstractArray interface
 Base.size(v::VectorView) = (sum(length, v.op.parts),)

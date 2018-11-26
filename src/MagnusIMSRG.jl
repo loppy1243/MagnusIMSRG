@@ -111,18 +111,21 @@ function solve(cb, h0::IMArrayOp)
     Ω
 end
 
-const ALG = AutoTsit5(Rosenbrock23())
+const ALG = RK4() # AutoTsit5(Rosenbrock23())
 solve_nomagnus(h0) = solve_nomagnus((xs...,) -> nothing, h0)
-function solve_nomagnus(cb, h0)
+function solve_nomagnus(cb, h0::IMArrayOp)
     @localgetparams(ELTYPE, INT_ATOL, INT_RTOL, MAX_INT_ITERS, INT_DIV_ATOL,
                     INT_DIV_RTOL, SPBASIS, PRINT_INFO, S_LARGE_STEP)
     s = 0.0
     n = 0
-    h = h0
+    h = similar(h0); vec(h) .= vec(h0)
     dE_2 = mbpt2(h)
 
-    dH(h, s) = comm(gen(h), h)
-    integrator = ODEProblem(dH, h, (s, s+S_LARGE_STEP)) |> x -> init(x, ALG)
+    function dH(v, _, s)
+        vec(h) .= v
+        comm(gen(h), h) |> vec |> collect
+    end
+    integrator = ODEProblem(dH, collect(vec(h0)), (s, s+S_LARGE_STEP)) |> x -> init(x, ALG)
 
     while abs(dE_2) > choosetol(INT_ATOL, INT_RTOL*abs(h.parts[0][]))
         ratio = dE_2/h.parts[0][]
@@ -135,16 +138,16 @@ function solve_nomagnus(cb, h0)
             break
         end
         PRINT_INFO && _solve_print_info(n, h.parts[0][], dE_2, ratio)
-        cb(s, Ω, h, dE_2)
+        cb(s, nothing, h, dE_2)
 
         solve!(integrator)
-        h = integrator.sol[end]
+        vec(h) .= integrator.sol[end]
         dE_2 = mbpt2(h)
         s += S_LARGE_STEP; add_tstop!(integrator, s+S_LARGE_STEP)
         n += 1
     end
     PRINT_INFO && _solve_print_info(n, h.parts[0][], dE_2, ratio)
-    cb(s, Ω, h, dE_2)
+    cb(s, nothing, h, dE_2)
 
     h
 end
