@@ -57,4 +57,4 @@ end
 
 end # module RunMagnusIMSRG
 
-RunMagnusIMSRG.run(magnus=false)
+RunMagnusIMSRG.run()

@@ -105,7 +105,7 @@ function solve(cb, h0::IMArrayOp)
         dE_2 = mbpt2(h)
         n += 1
     end
-    PRINT_INFO && _solve_print_info(n, h.parts[0][], dE_2, dE_2/h.parts[0])
+    PRINT_INFO && _solve_print_info(n, h.parts[0][], dE_2, dE_2/h.parts[0][])
     cb(s, Ω, h, dE_2)
 
     Ω
