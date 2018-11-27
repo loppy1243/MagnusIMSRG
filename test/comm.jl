@@ -3,8 +3,7 @@ using MagnusIMSRG.Commutators: comm2, comm2_pw
 
 commtest(; atol) = @testset "Commutators" begin
     MagnusIMSRG.@localgetparams SPBASIS
-    fdims = fulldims(SPBASIS)
-    dims(N) = Tuple(d for _=1:N for d in fdims)
+    dims(N) = Tuple(d for _=1:N for d in fulldims(SPBASIS))
 
     op1 = randimop(Float64, dims(2), dims(4))
     op2 = randimop(Float64, dims(2), dims(4))

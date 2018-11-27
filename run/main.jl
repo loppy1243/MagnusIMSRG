@@ -7,15 +7,16 @@ module RunMagnusIMSRG
 using ManyBody, MagnusIMSRG, MagnusIMSRG.IMOperators
 using Plots; gr()
 
-using MagnusIMSRG: @localgetparams
+using MagnusIMSRG: @getparams, @setparams
 import MagnusIMSRG.Hamiltonians: impairing
 using LinearAlgebra: eigvals
+
+@setparams MAX_INT_ITERS = 10^6
+@getparams SPBASIS, ELTYPE, REFSTATE, MBBASIS
 
 Plots.default(legend=false, dpi=200, grid=false)
 
 function run(; magnus=true)
-    @localgetparams SPBASIS, ELTYPE, REFSTATE, MBBASIS
-
     mbop(op) = IMOperators.mbop(op, REFSTATE, MBBASIS, MBBASIS)
 
     h0 = tabulate(impairing(REFSTATE, 1, 0.5), IMArrayOp{2, ELTYPE},
@@ -53,6 +54,13 @@ function run(; magnus=true)
     end
 
     ss, Es, exact_eigs, eigss, plt
+end
+
+function solve_bare(magnus=true)
+    h0 = tabulate(impairing(REFSTATE, 1, 0.5), IMArrayOp{2, ELTYPE},
+                  (Array, 2, SPBASIS), (Array, 4, SPBASIS))
+    solve = magnus ? MagnusIMSRG.solve : MagnusIMSRG.solve_nomagnus
+    solve(h0)
 end
 
 end # module RunMagnusIMSRG

@@ -1,4 +1,4 @@
-@with_kw struct Params
+@with_kw mutable struct Params
     S_LARGE_STEP    ::Float64                  = 1.0
     S_SMALL_STEP    ::Float64                  = 0.1
     TRUNC_LEVEL     ::Int                      = 2

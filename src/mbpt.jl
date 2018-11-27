@@ -1,5 +1,5 @@
+@getparams HOLES, PARTS
 function mbpt2(op::IMArrayOp{2})
-    @localgetparams HOLES, PARTS
     E, f, Γ = op.parts
 
     ret = zero(E[])

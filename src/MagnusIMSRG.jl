@@ -31,9 +31,9 @@ const gen = getfield(Generators, PARAMS.GENERATOR)
 
 factorial(T::Type{<:Number}, n::Integer) = prod(one(T):convert(T, n))
 
+@getparams Ω_ATOL, Ω_RTOL, Ω_BATCHSIZE
 function dΩ(Ω, h)
     @debug "Entering dΩ"
-    @localgetparams Ω_ATOL, Ω_RTOL, Ω_BATCHSIZE
     @debug "dΩ term" n=0
 
     prev_tot = zero(Ω)
@@ -52,9 +52,9 @@ function dΩ(Ω, h)
     tot
 end
 
+@getparams H_ATOL, H_RTOL, H_BATCHSIZE
 function H(Ω, h0)
     @debug "Entering H"
-    @localgetparams H_ATOL, H_RTOL, H_BATCHSIZE
     @debug "H term" n=0
     prev_tot = zero(h0)
     prev_ad = h0
@@ -96,7 +96,7 @@ function solve(cb, h0::IMArrayOp)
             @warn "Divergence threshold exceeded in solve()" n s ratio
             break
         end
-        PRINT_INFO && _solve_print_info(n, h.parts[0][], dE_2, ratio)
+        PRINT_INFO && _solve_print_info(n, h.parts[0][], dE_2, ratio, MAX_INT_ITERS, INT_RTOL)
         cb(s, Ω, h, dE_2)
 
         Ω += dΩ(Ω, h) * S_SMALL_STEP
@@ -105,7 +105,8 @@ function solve(cb, h0::IMArrayOp)
         dE_2 = mbpt2(h)
         n += 1
     end
-    PRINT_INFO && _solve_print_info(n, h.parts[0][], dE_2, dE_2/h.parts[0][])
+    PRINT_INFO && _solve_print_info(n, h.parts[0][], dE_2, dE_2/h.parts[0][],
+                                    MAX_INT_ITERS, INT_RTOL)
     cb(s, Ω, h, dE_2)
 
     Ω
@@ -137,7 +138,7 @@ function solve_nomagnus(cb, h0::IMArrayOp)
             @warn "Divergence threshold exceeded in solve()" n s ratio
             break
         end
-        PRINT_INFO && _solve_print_info(n, h.parts[0][], dE_2, ratio)
+        PRINT_INFO && _solve_print_info(n, h.parts[0][], dE_2, ratio, MAX_INT_ITERS, INT_RTOL)
         cb(s, nothing, h, dE_2)
 
         solve!(integrator)
@@ -146,15 +147,14 @@ function solve_nomagnus(cb, h0::IMArrayOp)
         s += S_LARGE_STEP; add_tstop!(integrator, s+S_LARGE_STEP)
         n += 1
     end
-    PRINT_INFO && _solve_print_info(n, h.parts[0][], dE_2, ratio)
+    PRINT_INFO && _solve_print_info(n, h.parts[0][], dE_2, ratio, MAX_INT_ITERS, INT_RTOL)
     cb(s, nothing, h, dE_2)
 
     h
 end
 
-function _solve_print_info(n, E, dE_2, r)
+function _solve_print_info(n, E, dE_2, r, MAX_INT_ITERS, INT_RTOL)
     try
-        @localgetparams MAX_INT_ITERS, INT_RTOL
         sigdigs = 5
 
         decdigs(x) = sigdigs - ndigits(trunc(Int, x))
