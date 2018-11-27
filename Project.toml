@@ -13,7 +13,5 @@ Plots = "91a5bcdd-55d7-5caf-9e0b-520d859cae80"
 Sundials = "c3572dad-4567-51f8-b174-8c6c989267f4"
 
 [extras]
+Combinatorics = "861a8166-3701-5b0c-9a16-15d98fcdc6aa"
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
-
-[targets]
-test = ["Test"]
