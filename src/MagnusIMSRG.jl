@@ -112,7 +112,7 @@ function solve(cb, h0::IMArrayOp)
     Ω
 end
 
-const ALG = RK4() # AutoTsit5(Rosenbrock23())
+const ALG = RK4()
 solve_nomagnus(h0) = solve_nomagnus((xs...,) -> nothing, h0)
 function solve_nomagnus(cb, h0::IMArrayOp)
     @localgetparams(ELTYPE, INT_ATOL, INT_RTOL, MAX_INT_ITERS, INT_DIV_ATOL,
