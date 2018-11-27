@@ -28,3 +28,18 @@ macro localgetparams(tuple_expr::Expr)
 
     _macro_getparams(tuple_expr.args, cnst=false)
 end
+
+function _macro_setparams(expr::Expr)
+    @assert expr.head === :(=)
+    @assert expr.args[1] isa Symbol || expr.args[1] isa Expr && expr.args[1].head === :tuple
+
+    lhs(x::Symbol) = :(PARAMS.$x)
+    lhs(x::Expr) = x.args .= lhs.(x.args)
+
+    :($(lhs(expr.args[1])) = $(esc(expr.args[2])))
+end
+macro setparams(exprs::Expr...)
+    quote
+        $(map(_macro_setparams, exprs)...)
+    end
+end
