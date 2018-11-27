@@ -248,12 +248,12 @@ function mbop(op::IMArrayOp{2}, ref, B1, B2)
         ret = E*overlap(X, Y)
         for p in SPB, q in SPB
             sgn, NA = normord(ref, Operators.@A(p', q))
-            ret += sgn*f[p, q]*NA(X, Y)
+            ret += f[p, q]*sgn*NA(X, Y)
         end
        
         for p in SPB, q in SPB, r in SPB, s in SPB
             sgn, NA = normord(ref, Operators.@A(p', q', s, r))
-            ret += sgn*Γ[p, q, r, s]*NA(X, Y)
+            ret += 4\Γ[p, q, r, s]*sgn*NA(X, Y)
         end
 
         ret

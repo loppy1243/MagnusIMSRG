@@ -16,7 +16,7 @@ function impairing(ref, δ, g)
         mask = (p.level == q.level)*(r.level == s.level) #=
             =# * spinup(p)*spindown(q)*spindown(s)*spinup(r)
 
-        -g/2*mask
+        4*(-g/2*mask)
     end
 
     (E, f, Γ)
