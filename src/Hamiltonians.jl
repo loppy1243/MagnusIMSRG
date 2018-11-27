@@ -18,8 +18,9 @@ function impairing(ref, δ, g)
 
         4*(-g/2*mask)
     end
+    Γ_AS(p, q, r, s) = Γ(p, q, r, s) - Γ(p, q, s, r)
 
-    (E, f, Γ)
+    (E, f, Γ_AS)
 end
 
 end # module Hamiltonians
