@@ -16,9 +16,9 @@ function impairing(ref, δ, g)
         mask = (p.level == q.level)*(r.level == s.level) #=
             =# * spinup(p)*spindown(q)*spindown(s)*spinup(r)
 
-        -g/2*mask
+        -g*mask
     end
-    Γ_AS(p, q, r, s) = Γ(p, q, r, s) - Γ(p, q, s, r)
+    Γ_AS(p, q, r, s) = 2\(Γ(p, q, r, s) + Γ(q, p, s, r) - Γ(p, q, s, r) - Γ(q, p, r, s))
 
     (E, f, Γ_AS)
 end

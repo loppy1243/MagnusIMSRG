@@ -1,7 +1,7 @@
 import MagnusIMSRG.Hamiltonians: impairing
 import ManyBody.Hamiltonians: pairing
 
-impairingtest(; atol, fullmatrix) = @testset "IMPairing Hamiltonian" begin
+impairingtest(; atol, fullmatrix) = @testset "IMPairing H" begin
     SPB = Bases.Pairing{4}
     DIM = dim(SPB)
     REF = RefStates.Fermi{SPB}(2)
@@ -24,23 +24,13 @@ impairingtest(; atol, fullmatrix) = @testset "IMPairing Hamiltonian" begin
     @testset "Hermiticity" begin
         for I in CartesianIndices(arr)
             i, j, k, l = Tuple(I)
-            if !(arr[i, j, k, l] == conj(arr[k, l, i, j]))
-                @show arr[i, j, k, l]
-                @show arr[k, l, i, j]
-                println()
-            end
+            @test arr[i, j, k, l] == conj(arr[k, l, i, j])
         end
     end
-#    @testset "Anti-symmetry" begin
-#        for I in CartesianIndices(arr)
-#            i, j, k, l = Tuple(I)
-#            if !(arr[i, j, k, l] == -arr[i, j, l, k] == arr[j, i, l, k] == -arr[j, i, k, l])
-#                @show arr[i, j, k, l]
-#                @show arr[i, j, l, k]
-#                @show arr[j, i, l, k]
-#                @show arr[j, i, k, l]
-#                println()
-#            end
-#        end
-#    end
+    @testset "Anti-symmetry" begin
+        for I in CartesianIndices(arr)
+            i, j, k, l = Tuple(I)
+            @test arr[i, j, k, l] == -arr[i, j, l, k] == arr[j, i, l, k] == -arr[j, i, k, l]
+        end
+    end
 end
