@@ -15,7 +15,7 @@
     H_BATCHSIZE     ::Int                      = 5
 
     INT_RTOL        ::Float64                  = 1e-8
-    INT_ATOL        ::Float64                  = 1e-3
+    INT_ATOL        ::Float64                  = 0
     INT_DIV_ATOL    ::Float64                  = 0.0
     INT_DIV_RTOL    ::Float64                  = 1.0
     MAX_INT_ITERS   ::Int                      = 100

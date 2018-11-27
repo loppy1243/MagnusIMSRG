@@ -175,7 +175,8 @@ function _solve_print_info(n, E, dE_2, r, MAX_INT_ITERS, INT_RTOL)
         dE_2 = rpad(dE_2, (dE_2<0)+ndigits(trunc(Int, dE_2))+1+E_decdigs, '0')
 
         println("$n: E = $E,  dE(2) = $dE_2,  Ratio = $r")
-    catch
+    catch ex
+        ex isa InterruptException && rethrow()
         println(stderr, "ERROR: Failed to print info.")
     end
 end
