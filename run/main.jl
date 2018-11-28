@@ -1,8 +1,3 @@
-if isdefined(Main, :RunMagnusIMSRG)
-    reload(RunMagnusIMSRG, :ManyBody)
-    reload(RunMagnusIMSRG, :MagnusIMSRG)
-end
-
 module RunMagnusIMSRG
 using ManyBody, MagnusIMSRG, MagnusIMSRG.IMOperators
 using Plots; gr()
