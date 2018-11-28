@@ -22,12 +22,12 @@ SIGNAL_OPS && include("signalops.jl")
 include("util.jl")
 include("IMOperators.jl");      using .IMOperators; const IMOps = IMOperators
 include("Commutators.jl");     import .Commutators
+const comm = getfield(Commutators, PARAMS.COMMUTATOR)
 include("Hamiltonians.jl");    import .Hamiltonians
 include("Generators/main.jl"); import .Generators
+const gen = getfield(Generators, PARAMS.GENERATOR)
 include("mbpt.jl")
 
-const comm = getfield(Commutators, PARAMS.COMMUTATOR)
-const gen = getfield(Generators, PARAMS.GENERATOR)
 
 factorial(T::Type{<:Number}, n::Integer) = prod(one(T):convert(T, n))
 
@@ -87,6 +87,7 @@ function solve(cb, h0::IMArrayOp)
     dE_2 = mbpt2(h)
 
     while abs(dE_2) > choosetol(INT_ATOL, INT_RTOL*abs(h.parts[0][]))
+        @show 
         ratio = dE_2/h.parts[0][]
         if n >= MAX_INT_ITERS
             @warn "Iteration maximum exceeded in solve()" n s
@@ -147,7 +148,8 @@ function solve_nomagnus(cb, h0::IMArrayOp)
         s += S_LARGE_STEP; add_tstop!(integrator, s+S_LARGE_STEP)
         n += 1
     end
-    PRINT_INFO && _solve_print_info(n, h.parts[0][], dE_2, ratio, MAX_INT_ITERS, INT_RTOL)
+    PRINT_INFO && _solve_print_info(n, h.parts[0][], dE_2, dE_2/h.parts[0][],
+                                    MAX_INT_ITERS, INT_RTOL)
     cb(s, nothing, h, dE_2)
 
     h
