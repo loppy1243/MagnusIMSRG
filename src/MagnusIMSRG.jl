@@ -88,11 +88,11 @@ function solve(cb, h0::IMArrayOp; onlylast=false)
     first = true
     data = nothing
 
-    function call_cb(last)
+    function call_cb(;last)
         ret = cb(s, Ω, h, dE_2)
         if ret !== nothing
             if onlylast
-                last && data = ret
+                last && (data = ret)
                 return
             elseif first
                 first = false
@@ -140,11 +140,11 @@ function solve_nomagnus(cb, h0::IMArrayOp; onlylast=false)
     dE_2 = mbpt2(h)
     data = nothing
 
-    function call_cb(last)
+    function call_cb(;last)
         ret = cb(s, nothing, h, dE_2)
         if ret !== nothing
             if onlylast
-                last && data = ret
+                last && (data = ret)
                 return
             elseif first
                 first = false
