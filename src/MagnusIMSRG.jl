@@ -75,8 +75,8 @@ function H(Ω, h0)
     tot
 end
 
-solve(h0) = solve((xs...,) -> nothing, h0)
-function solve(cb, h0::IMArrayOp)
+solve(h0) = solve((s, Ω, h, dE) -> Ω, h0; onlylast=true)
+function solve(cb, h0::IMArrayOp; onlylast=false)
     @localgetparams(ELTYPE, INT_ATOL, INT_RTOL, MAX_INT_ITERS, INT_DIV_ATOL,
                     INT_DIV_RTOL, SPBASIS, PRINT_INFO, S_SMALL_STEP)
 
@@ -85,9 +85,25 @@ function solve(cb, h0::IMArrayOp)
     Ω = zero(h0)
     h = h0
     dE_2 = mbpt2(h)
+    first = true
+    data = nothing
+
+    function call_cb(last)
+        ret = cb(s, Ω, h, dE_2)
+        if ret !== nothing
+            if onlylast
+                last && data = ret
+                return
+            elseif first
+                first = false
+                data = ret
+            else
+                data = map(vcat, data, ret)
+            end
+        end
+    end
 
     while abs(dE_2) > choosetol(INT_ATOL, INT_RTOL*abs(h.parts[0][]))
-        @show 
         ratio = dE_2/h.parts[0][]
         if n >= MAX_INT_ITERS
             @warn "Iteration maximum exceeded in solve()" n s
@@ -98,7 +114,7 @@ function solve(cb, h0::IMArrayOp)
             break
         end
         PRINT_INFO && _solve_print_info(n, h.parts[0][], dE_2, ratio, MAX_INT_ITERS, INT_RTOL)
-        cb(s, Ω, h, dE_2)
+        call_cb(last=false)
 
         Ω += dΩ(Ω, h) * S_SMALL_STEP
         s += S_SMALL_STEP
@@ -108,20 +124,36 @@ function solve(cb, h0::IMArrayOp)
     end
     PRINT_INFO && _solve_print_info(n, h.parts[0][], dE_2, dE_2/h.parts[0][],
                                     MAX_INT_ITERS, INT_RTOL)
-    cb(s, Ω, h, dE_2)
+    call_cb(last=true)
 
-    Ω
+    data
 end
 
 const ALG = RK4()
-solve_nomagnus(h0) = solve_nomagnus((xs...,) -> nothing, h0)
-function solve_nomagnus(cb, h0::IMArrayOp)
+solve_nomagnus(h0) = solve_nomagnus((s, Ω, h, dE) -> h, h0; onlylast=true)
+function solve_nomagnus(cb, h0::IMArrayOp; onlylast=false)
     @localgetparams(ELTYPE, INT_ATOL, INT_RTOL, MAX_INT_ITERS, INT_DIV_ATOL,
                     INT_DIV_RTOL, SPBASIS, PRINT_INFO, S_LARGE_STEP)
     s = 0.0
     n = 0
     h = similar(h0); vec(h) .= vec(h0)
     dE_2 = mbpt2(h)
+    data = nothing
+
+    function call_cb(last)
+        ret = cb(s, nothing, h, dE_2)
+        if ret !== nothing
+            if onlylast
+                last && data = ret
+                return
+            elseif first
+                first = false
+                data = ret
+            else
+                data = map(vcat, data, ret)
+            end
+        end
+    end
 
     function dH(v, _, s)
         vec(h) .= v
@@ -140,7 +172,7 @@ function solve_nomagnus(cb, h0::IMArrayOp)
             break
         end
         PRINT_INFO && _solve_print_info(n, h.parts[0][], dE_2, ratio, MAX_INT_ITERS, INT_RTOL)
-        cb(s, nothing, h, dE_2)
+        call_cb(last=false)
 
         solve!(integrator)
         vec(h) .= integrator.sol[end]
@@ -150,9 +182,9 @@ function solve_nomagnus(cb, h0::IMArrayOp)
     end
     PRINT_INFO && _solve_print_info(n, h.parts[0][], dE_2, dE_2/h.parts[0][],
                                     MAX_INT_ITERS, INT_RTOL)
-    cb(s, nothing, h, dE_2)
+    call_cb(last=true)
 
-    h
+    data
 end
 
 function _solve_print_info(n, E, dE_2, r, MAX_INT_ITERS, INT_RTOL)
