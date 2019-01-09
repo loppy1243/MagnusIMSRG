@@ -14,8 +14,8 @@ isocc(a) = ManyBody.isocc(REFSTATE, a)
 isunocc(a) = ManyBody.isunocc(REFSTATE, a)
 
 ### Occupation Matrices ######################################################################
-# hole*particle or -(particle*hole)
-const OMAT_HmH = [isocc(a)-isocc(b) for a in SPBASIS, b in SPBASIS]
+# hole-hole or -(particle-particle)
+const OMAT_HmH = [isocc(b)-isocc(a) for a in SPBASIS, b in SPBASIS]
 # particle*particle or -(hole*hole)
 const OMAT_1mHmH = [1-isocc(a)-isocc(b) for a in SPBASIS, b in SPBASIS]
 # particle*particle*hole + hole*hole*particle
@@ -77,16 +77,32 @@ _comm2_pw(A1, A2, B1, B2) = tabulate(Array{ELTYPE}, 4, SPBASIS) do i, j, k, l
     =#- _comm2_1_2_pw(B1, A2, i, j, k, l)
 end
 
+#function _comm0_1_1(A, B)
+#    matrix(x) = reshape(x, DIM, DIM)
+#
+#    α = matrix(A.*OMAT_HmH)
+#    B′ = matrix(B)
+#
+#    tr(α*B′)
+#end
+#_comm0_1_1_pw(A, B) = cartesian_sum(2, SPBASIS) do i, j
+#    (isocc(j)-isocc(i))*A[i, j]*B[j, i]
+#end
 function _comm0_1_1(A, B)
-    matrix(x) = reshape(x, DIM, DIM)
-
-    α = matrix(A.*OMAT_HmH)
-    B′ = matrix(B)
-
-    tr(α*B′)
+    α = copy(A)
+    LI = LinearIndices(SPBASIS)
+    for i in LI, (j, b) in zip(LI, SPBASIS)
+        α[i, j] = A[i, j]*isocc(b)
+    end
+    ret = tr(α*B)
+    for (i, a) in zip(LI, SPBASIS), j in LI
+        α[i, j] = A[i, j]*isocc(a)
+    end
+    
+    ret - tr(B*α)
 end
 _comm0_1_1_pw(A, B) = cartesian_sum(2, SPBASIS) do i, j
-    (isocc(i)-isocc(j))*A[i, j]*B[j, i]
+    isocc(j)*(A[i, j]*B[j, i] - B[i, j]*A[j, i])
 end
 
 function _comm0_2_2(A, B)

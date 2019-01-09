@@ -2,7 +2,7 @@ module MagnusIMSRG
 
 using ManyBody
 using Parameters, OrdinaryDiffEq
-using JuliaUtil: bernoulli
+using JuliaUtil: bernoulli, roundprec
 #using Sundials: CVODE_BDF
 
 
@@ -103,7 +103,8 @@ function solve(cb, h0::IMArrayOp; onlylast=false)
         end
     end
 
-    while abs(dE_2) > choosetol(INT_ATOL, INT_RTOL*abs(h.parts[0][]))
+#    while abs(dE_2) > choosetol(INT_ATOL, INT_RTOL*abs(h.parts[0][]))
+    while abs(dE_2) > INT_RTOL*abs(h.parts[0][])
         ratio = dE_2/h.parts[0][]
         if n >= MAX_INT_ITERS
             @warn "Iteration maximum exceeded in solve()" n s
@@ -199,8 +200,7 @@ function _solve_print_info(n, E, dE_2, r, MAX_INT_ITERS, INT_RTOL)
 
         n = lpad(n, ndigits(MAX_INT_ITERS))
 
-        r = round(r, digits=r_decdigs)
-        r = rpad(r, ndigits(trunc(Int, r))+1+r_decdigs, '0')
+        r = roundprec(r, INT_RTOL)
 
         E = round(E, sigdigits=sigdigs)
         E = rpad(E, (E<0)+sigdigs+1, '0')
