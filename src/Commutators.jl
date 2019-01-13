@@ -83,7 +83,7 @@ end
 function _comm0_1_1(A, B)
     matrix(x) = reshape(x, DIM, DIM)
 
-    α = matrix(A.*transpose(OMAT_HPmPH))
+    α = matrix(A.*OMAT_HPmPH)
     B′ = matrix(B)
 
     tr(α*B′)
