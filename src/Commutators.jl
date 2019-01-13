@@ -14,11 +14,12 @@ isocc(a) = ManyBody.isocc(REFSTATE, a)
 isunocc(a) = ManyBody.isunocc(REFSTATE, a)
 
 ### Occupation Matrices ######################################################################
-# hole-hole or -(particle-particle)
-const OMAT_HmH = [isocc(a)-isocc(b) for a in SPBASIS, b in SPBASIS]
-const OMAT_HPmHP = [isocc(a)*isunocc(b) - isocc(b)*isunocc(a)
+# hole - hole (transposed)
+const OMAT_HmH = [isocc(b)-isocc(a) for a in SPBASIS, b in SPBASIS]
+# hole*particle - particle*hole
+const OMAT_HPmPH = [isocc(a)*isunocc(b) - isunocc(a)*isocc(b)
                      for a in SPBASIS, b in SPBASIS]
-# particle*particle or -(hole*hole)
+# particle*particle
 const OMAT_1mHmH = [1-isocc(a)-isocc(b) for a in SPBASIS, b in SPBASIS]
 # particle*particle*hole + hole*hole*particle
 const OMAT_PPHpHHP = [isunocc(a)*isunocc(b)*isocc(c) + isocc(a)*isocc(b)*isunocc(c)
@@ -82,7 +83,7 @@ end
 function _comm0_1_1(A, B)
     matrix(x) = reshape(x, DIM, DIM)
 
-    α = matrix(A.*transpose(OMAT_HPmHP))
+    α = matrix(A.*transpose(OMAT_HPmPH))
     B′ = matrix(B)
 
     tr(α*B′)
@@ -120,7 +121,7 @@ function _comm1_1_2(A, B)
     matrix22(x) = reshape(x, DIM^2, DIM^2)
     matrix11(x) = reshape(x, DIM, DIM)
 
-    α = vector(A.*OMAT_HPmHP)
+    α = vector(A.*OMAT_HPmPH)
 
     # [b, i, a, j] -> [i, j, a, b]
     B′ = matrix22(PermutedDimsArray(B, [2, 4, 3, 1]))
@@ -202,7 +203,7 @@ function _comm2_2_2(A, B)
     C ./= 2
 
     # [i, b, a, l] -> [a, b, i, l]
-    α .= matrix(PermutedDimsArray(A, [3, 2, 1, 4].*OMAT_HmH))
+    α .= matrix(PermutedDimsArray(A, [3, 2, 1, 4]).*OMAT_HmH)
     # [a, j, k, b] -> [j, k, a, b]
     β .= matrix(PermutedDimsArray(B, [2, 3, 1, 4]))
     # [j, k, a, b]*[a, b, i, l] = [j, k, i, l]
