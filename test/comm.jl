@@ -24,7 +24,7 @@ commtest(; atol) = @testset "Commutators" begin
 
     op1 = (op1 + op1')/2
     op2 = (op2 + op2')/2
-    @testset "Hermiticiy ($comm_func)" for comm_func in TWO_BODY_COMMS
+    @testset "(anti-)Hermiticiy ($comm_func)" for comm_func in TWO_BODY_COMMS
         comm_val = comm_func(op1, op2)
         test_within_tol((comm_val + comm_val')/2)
     end
